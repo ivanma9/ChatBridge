@@ -1,0 +1,21 @@
+{
+  "id": "chess",
+  "version": "0.1.0",
+  "name": "Chess",
+  "description": "Interactive chess app embedded inside the host chat.",
+  "entryUrl": "http://localhost:3202",
+  "origin": "http://localhost:3202",
+  "permissions": ["session:write"],
+  "scopes": [],
+  "tools": [
+    {
+      "name": "launch_chess",
+      "description": "Launch an interactive chess game where the user plays as white against an AI opponent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  ]
+}
