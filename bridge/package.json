@@ -1,0 +1,31 @@
+{
+  "name": "@chatbridge/bridge",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "npx tsx src/server.ts",
+    "start": "npx tsx src/server.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "npx tsx src/db/migrate.ts",
+    "db:seed": "npx tsx src/db/seed.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "deep-diff": "^1.0.2",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "kysely": "^0.28.15",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/deep-diff": "^1.0.5",
+    "@types/express": "^5.0.0",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.19.2",
+    "vitest": "^4.1.2"
+  }
+}
