@@ -57,6 +57,22 @@ if (spotifyClientId && spotifyClientSecret) {
   console.warn('[bridge] Spotify OAuth disabled — missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET')
 }
 
+// App tool requests (OAuth, API proxying)
+app.post('/api/app-tool/:toolName', express.json(), (req, res) => {
+  const { toolName } = req.params
+  const { app_id, args } = req.body
+
+  // Spotify auth: return the auth start URL
+  if (toolName === 'request_spotify_auth') {
+    const authUrl = `http://localhost:${PORT}/auth/spotify/start`
+    res.json({ status: 'connecting', scopes: [], authUrl })
+    return
+  }
+
+  // Default: tool not implemented
+  res.status(404).json({ error: `Tool ${toolName} not implemented` })
+})
+
 // Review & registry routes (require DB)
 if (dbReady) {
   app.use('/api/admin/submissions', adminAuth, submissionRouter)
