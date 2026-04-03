@@ -34,7 +34,10 @@ const SEED_APPS = [
       origin: 'http://localhost:3202',
       permissions: [],
       scopes: [],
-      tools: [{ name: 'chess_new_game', description: 'Start a new chess game', inputSchema: {} }],
+      tools: [
+        { name: 'launch_chess', description: 'Launch an interactive chess game where the user plays as white against an AI opponent.', inputSchema: { type: 'object', properties: {}, required: [] } },
+        { name: 'get_board_state', description: 'Get the current chess board state including position (FEN), move history, whose turn it is, and whether the game is in check/checkmate/stalemate. Use this when the user asks about the current position, wants move suggestions, or asks about game status.', inputSchema: { type: 'object', properties: {}, required: [] } },
+      ],
     },
   },
   {
@@ -68,7 +71,11 @@ const SEED_APPS = [
       origin: 'http://localhost:3204',
       permissions: [],
       scopes: ['playlist-read-private', 'playlist-modify-private', 'user-read-email'],
-      tools: [{ name: 'spotify_search', description: 'Search for music', inputSchema: { type: 'object', properties: { query: { type: 'string' } } } }],
+      tools: [
+            { name: 'launch_spotify', description: "Show the user's Spotify playlists. Requires Spotify authorization.", inputSchema: { type: 'object', properties: {}, required: [] } },
+            { name: 'create_spotify_playlist', description: 'Create a new Spotify playlist for the user.', inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'The name for the new playlist.' } }, required: ['name'] } },
+            { name: 'search_spotify', description: 'Search for songs on Spotify.', inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'The search query.' } }, required: ['query'] } },
+          ],
     },
   },
 ]

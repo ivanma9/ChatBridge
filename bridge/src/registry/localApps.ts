@@ -45,6 +45,15 @@ export const localAppManifests: ChatBridgeAppManifest[] = [
           properties: {},
           required: []
         }
+      },
+      {
+        name: 'get_board_state',
+        description: 'Get the current chess board state including position (FEN), move history, whose turn it is, and whether the game is in check/checkmate/stalemate. Use this when the user asks about the current position, wants move suggestions, or asks about game status.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: []
+        }
       }
     ]
   },
@@ -82,7 +91,7 @@ export const localAppManifests: ChatBridgeAppManifest[] = [
     entryUrl: 'http://localhost:3204',
     origin: 'http://localhost:3204',
     permissions: ['session:write', 'auth:oauth'],
-    scopes: ['playlist-read-private', 'user-read-email'],
+    scopes: ['playlist-read-private', 'playlist-modify-private', 'user-read-email'],
     tools: [
       {
         name: 'launch_spotify',
@@ -91,6 +100,34 @@ export const localAppManifests: ChatBridgeAppManifest[] = [
           type: 'object',
           properties: {},
           required: []
+        }
+      },
+      {
+        name: 'create_spotify_playlist',
+        description: 'Create a new Spotify playlist for the user.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'The name for the new playlist.'
+            }
+          },
+          required: ['name']
+        }
+      },
+      {
+        name: 'search_spotify',
+        description: 'Search for songs on Spotify.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: "The search query, e.g. 'bohemian rhapsody', 'chill lo-fi'."
+            }
+          },
+          required: ['query']
         }
       }
     ]

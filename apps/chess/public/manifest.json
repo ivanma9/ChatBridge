@@ -16,6 +16,15 @@
         "properties": {},
         "required": []
       }
+    },
+    {
+      "name": "get_board_state",
+      "description": "Get the current chess board state including position (FEN), move history, whose turn it is, and whether the game is in check/checkmate/stalemate. Use this when the user asks about the current position, wants move suggestions, or asks about game status.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
     }
   ]
 }
