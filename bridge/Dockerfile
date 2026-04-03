@@ -10,8 +10,7 @@ RUN npm ci
 
 # Copy source
 COPY src/ src/
-COPY ../packages/app-sdk/src/ /packages/app-sdk/src/
 
-EXPOSE 3300
+EXPOSE 8080
 
 CMD ["npx", "tsx", "src/server.ts"]
