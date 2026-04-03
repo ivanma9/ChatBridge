@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import { getBridgeClientTokenFromHeaders, verifyBridgeClientToken } from '../auth/BridgeClientSession.js'
 
 export function adminAuth(req: Request, res: Response, next: NextFunction): void {
   const apiKey = req.headers['x-admin-key']
@@ -37,5 +38,22 @@ export function bridgeAuth(req: Request, res: Response, next: NextFunction): voi
     return
   }
 
+  next()
+}
+
+export function bridgeClientAuth(req: Request, res: Response, next: NextFunction): void {
+  const token = getBridgeClientTokenFromHeaders(req.headers as Record<string, unknown>)
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized: missing bridge client token' })
+    return
+  }
+
+  const payload = verifyBridgeClientToken(token)
+  if (!payload) {
+    res.status(401).json({ error: 'Unauthorized: invalid or expired bridge client token' })
+    return
+  }
+
+  ;(req as Request & { bridgeClientId: string }).bridgeClientId = payload.client_id
   next()
 }

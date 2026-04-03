@@ -1,8 +1,14 @@
 import { Router } from 'express'
+import type { Request } from 'express'
 import * as registryRepo from '../db/repositories/registryRepository.js'
 import type { ActiveRegistryApp } from '../../../../packages/app-sdk/src/contracts.js'
+import { bridgeClientAuth } from './authMiddleware.js'
 
 export const registryRouter = Router()
+
+function getBridgeClientId(req: Request): string {
+  return (req as Request & { bridgeClientId: string }).bridgeClientId
+}
 
 // GET /api/registry/active — List all active registry entries
 registryRouter.get('/active', async (_req, res) => {
@@ -54,7 +60,7 @@ registryRouter.get('/active/:appId', async (req, res) => {
 })
 
 // POST /api/sessions/launch — Launch app in chat session (pins version)
-registryRouter.post('/sessions/launch', async (req, res) => {
+registryRouter.post('/sessions/launch', bridgeClientAuth, async (req, res) => {
   try {
     const { chat_session_id, app_id } = req.body
     if (!chat_session_id || !app_id) {
@@ -62,12 +68,8 @@ registryRouter.post('/sessions/launch', async (req, res) => {
       return
     }
 
-    // Check for existing session (same chat+app, or any session with saved state)
-    let existing = await registryRepo.findAppSessionByChatAndApp(chat_session_id, app_id)
-    if (!existing) {
-      // Look for any previous session with saved state for this app
-      existing = (await registryRepo.findLatestSessionWithState(app_id)) || null
-    }
+    const clientId = getBridgeClientId(req)
+    const existing = await registryRepo.findAppSessionByClientChatAndApp(clientId, chat_session_id, app_id)
     if (existing) {
       const entry = await registryRepo.findRegistryEntry(app_id)
       if (!entry) {
@@ -101,6 +103,7 @@ registryRouter.post('/sessions/launch', async (req, res) => {
 
     // Create session pinned to current version
     const session = await registryRepo.createAppSession({
+      client_id: clientId,
       chat_session_id,
       app_id,
       pinned_version_id: entry.version_id,
@@ -128,11 +131,15 @@ registryRouter.post('/sessions/launch', async (req, res) => {
 })
 
 // GET /api/sessions/:appSessionId/status — Session status with version update check
-registryRouter.get('/sessions/:appSessionId/status', async (req, res) => {
+registryRouter.get('/sessions/:appSessionId/status', bridgeClientAuth, async (req, res) => {
   try {
     const session = await registryRepo.findAppSession(req.params.appSessionId)
     if (!session) {
       res.status(404).json({ error: 'Session not found' })
+      return
+    }
+    if (session.client_id !== getBridgeClientId(req)) {
+      res.status(403).json({ error: 'Forbidden: session does not belong to this bridge client' })
       return
     }
 
@@ -154,11 +161,15 @@ registryRouter.get('/sessions/:appSessionId/status', async (req, res) => {
 })
 
 // PUT /api/sessions/:appSessionId/state — Save app state
-registryRouter.put('/sessions/:appSessionId/state', async (req, res) => {
+registryRouter.put('/sessions/:appSessionId/state', bridgeClientAuth, async (req, res) => {
   try {
     const session = await registryRepo.findAppSession(req.params.appSessionId)
     if (!session) {
       res.status(404).json({ error: 'Session not found' })
+      return
+    }
+    if (session.client_id !== getBridgeClientId(req)) {
+      res.status(403).json({ error: 'Forbidden: session does not belong to this bridge client' })
       return
     }
 
@@ -177,10 +188,19 @@ registryRouter.put('/sessions/:appSessionId/state', async (req, res) => {
 })
 
 // GET /api/sessions/:appSessionId/state — Load app state
-registryRouter.get('/sessions/:appSessionId/state', async (req, res) => {
+registryRouter.get('/sessions/:appSessionId/state', bridgeClientAuth, async (req, res) => {
   try {
-    const state = await registryRepo.getSessionState(req.params.appSessionId)
-    res.json({ state })
+    const session = await registryRepo.findAppSession(req.params.appSessionId)
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' })
+      return
+    }
+    if (session.client_id !== getBridgeClientId(req)) {
+      res.status(403).json({ error: 'Forbidden: session does not belong to this bridge client' })
+      return
+    }
+
+    res.json({ state: session.state ?? null })
   } catch (err) {
     console.error('[sessions] Load state error:', err)
     res.status(500).json({ error: 'Internal server error' })

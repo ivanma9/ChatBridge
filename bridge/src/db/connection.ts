@@ -86,6 +86,7 @@ export interface RegistryEntriesTable {
 
 export interface AppSessionsTable {
   id: string
+  client_id: string
   chat_session_id: string
   app_id: string
   pinned_version_id: string
