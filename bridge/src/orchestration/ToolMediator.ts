@@ -4,6 +4,7 @@ import { getDb } from '../db/connection.js'
 export interface ToolRequest {
   app_id: string
   session_id?: string
+  client_id?: string
   tool_name: string
   args: Record<string, unknown>
 }
@@ -93,6 +94,7 @@ async function logToolExecution(
       .values({
         app_id: request.app_id,
         session_id: request.session_id || null,
+        client_id: request.client_id || null,
         tool_name: request.tool_name,
         args: JSON.stringify(request.args),
         status,

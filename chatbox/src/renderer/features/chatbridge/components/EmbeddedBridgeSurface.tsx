@@ -2,20 +2,20 @@ import { ActionIcon, Box, Flex, Text } from '@mantine/core'
 import { IconX } from '@tabler/icons-react'
 import { useEffect, useRef } from 'react'
 import { bridgeFetch } from '../bridgeClient'
+import { buildAppUrl } from '../buildAppUrl'
+import { isTrustedBridgeEnvelope } from '../messageValidation'
+import { doesEntryUrlMatchAllowedOrigin } from '../originValidation'
 import { useBridgeSurfaceStore } from '../stores/bridgeSurfaceStore'
 import { useBridgeApps, useLaunchApp } from '../hooks/useBridgeApps'
 import { BRIDGE_URL } from '../config'
 
-function buildAppUrl(appId: string, directUrl: string, toolInput?: Record<string, unknown>): string {
-  const url = new URL(directUrl)
-  if (toolInput) {
-    for (const [key, value] of Object.entries(toolInput)) {
-      if (value !== undefined && value !== null) {
-        url.searchParams.set(key, String(value))
-      }
-    }
-  }
-  return url.toString()
+const BRIDGE_PROTOCOL_VERSION = '1'
+
+interface BridgeEnvelope<TEvent> {
+  protocolVersion: typeof BRIDGE_PROTOCOL_VERSION
+  appSessionId: string
+  nonce: string
+  event: TEvent
 }
 
 export function EmbeddedBridgeSurface() {
@@ -27,16 +27,51 @@ export function EmbeddedBridgeSurface() {
   const { apps } = useBridgeApps()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const initSent = useRef(false)
+  const mountNonceRef = useRef('')
+  const authPollTimerRef = useRef<number | null>(null)
 
   const activeApp = apps.find((a) => a.app_id === activeAppId)
+  const hasApprovedOrigin = activeApp
+    ? doesEntryUrlMatchAllowedOrigin(activeApp.entry_url, activeApp.allowed_origin)
+    : false
+
+  function nextNonce(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+    return `nonce-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  }
 
   // Reset init guard when app changes
   useEffect(() => {
     initSent.current = false
-  }, [activeAppId])
+    mountNonceRef.current = nextNonce()
+  }, [activeAppId, activeAppSessionId])
 
   useEffect(() => {
-    if (!activeApp || !iframeRef.current) return
+    if (!activeApp || !iframeRef.current || !hasApprovedOrigin || !activeAppSessionId) return
+
+    const stopAuthPolling = () => {
+      if (authPollTimerRef.current !== null) {
+        window.clearInterval(authPollTimerRef.current)
+        authPollTimerRef.current = null
+      }
+    }
+
+    const sendToApp = (event: { type: string; payload: unknown }) => {
+      if (!iframeRef.current?.contentWindow) {
+        return
+      }
+
+      const envelope: BridgeEnvelope<typeof event> = {
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        appSessionId: activeAppSessionId,
+        nonce: mountNonceRef.current,
+        event,
+      }
+
+      iframeRef.current.contentWindow.postMessage(envelope, activeApp.allowed_origin)
+    }
 
     const sendInit = async () => {
       if (initSent.current || !iframeRef.current?.contentWindow) return
@@ -60,46 +95,104 @@ export function EmbeddedBridgeSurface() {
       }
 
       if (savedState) {
-        iframeRef.current.contentWindow.postMessage(
-          { type: 'host:resume-session', payload: { appSessionId: activeAppSessionId, state: savedState } },
-          '*'
-        )
+        sendToApp({ type: 'host:resume-session', payload: { appSessionId: activeAppSessionId, state: savedState } })
       } else {
-        iframeRef.current.contentWindow.postMessage(
-          {
-            type: 'host:init',
-            payload: {
-              appId: activeApp.app_id,
-              appSessionId: activeAppSessionId || `session-${Date.now()}`,
-              chatSessionId: `chat-${Date.now()}`,
-              input: toolInput || {},
-            },
+        sendToApp({
+          type: 'host:init',
+          payload: {
+            appId: activeApp.app_id,
+            appSessionId: activeAppSessionId,
+            chatSessionId: `chat-${Date.now()}`,
+            input: toolInput || {},
           },
-          '*'
-        )
+        })
 
         // Send default auth state (disconnected) so apps can show connect screen
         setTimeout(() => {
-          iframeRef.current?.contentWindow?.postMessage(
-            { type: 'host:auth-state', payload: { status: 'disconnected', scopes: [] } },
-            '*'
-          )
+          sendToApp({ type: 'host:auth-state', payload: { status: 'disconnected', scopes: [] } })
         }, 100)
 
         if (toolInput && Object.keys(toolInput).length > 0) {
           setTimeout(() => {
-            iframeRef.current?.contentWindow?.postMessage(
-              { type: 'host:tool-result', payload: { toolName: 'init', result: toolInput } },
-              '*'
-            )
+            sendToApp({ type: 'host:tool-result', payload: { toolName: 'init', result: toolInput } })
           }, 200)
         }
       }
     }
 
+    const startAuthPolling = (statusPath: string) => {
+      stopAuthPolling()
+      authPollTimerRef.current = window.setInterval(async () => {
+        try {
+          const res = await bridgeFetch(`${BRIDGE_URL}${statusPath}`)
+          if (!res.ok) {
+            stopAuthPolling()
+            sendToApp({ type: 'host:auth-state', payload: { status: 'disconnected', scopes: [] } })
+            return
+          }
+
+          const authState = await res.json()
+          sendToApp({ type: 'host:auth-state', payload: authState })
+
+          if (authState.status !== 'connecting') {
+            stopAuthPolling()
+          }
+        } catch {
+          stopAuthPolling()
+        }
+      }, 1000)
+    }
+
+    const openAuthWindow = async (toolName: string, startPath: string, statusPath: string) => {
+      try {
+        const response = await bridgeFetch(`${BRIDGE_URL}${startPath}`, {
+          method: 'POST',
+        })
+        if (!response.ok) {
+          sendToApp({
+            type: 'host:tool-result',
+            payload: { toolName, result: { error: 'Could not start the authorization flow.' } },
+          })
+          sendToApp({ type: 'host:auth-state', payload: { status: 'disconnected', scopes: [] } })
+          return
+        }
+
+        const data = await response.json()
+        if (typeof data.url === 'string' && data.url) {
+          window.open(data.url, 'chatbridge-auth', 'width=500,height=700')
+          startAuthPolling(statusPath)
+          return
+        }
+
+        sendToApp({
+          type: 'host:tool-result',
+          payload: { toolName, result: { error: 'Authorization provider did not return a launch URL.' } },
+        })
+        sendToApp({ type: 'host:auth-state', payload: { status: 'disconnected', scopes: [] } })
+      } catch {
+        stopAuthPolling()
+        sendToApp({
+          type: 'host:tool-result',
+          payload: { toolName, result: { error: 'Could not open the authorization window.' } },
+        })
+        sendToApp({ type: 'host:auth-state', payload: { status: 'disconnected', scopes: [] } })
+      }
+    }
+
     const handler = (event: MessageEvent) => {
-      const data = event.data
-      if (!data?.type) return
+      if (!isTrustedBridgeEnvelope({
+        data: event.data,
+        origin: event.origin,
+        expectedOrigin: activeApp.allowed_origin,
+        source: event.source,
+        expectedSource: iframeRef.current?.contentWindow ?? null,
+        expectedSessionId: activeAppSessionId,
+        expectedNonce: mountNonceRef.current,
+      })) {
+        return
+      }
+
+      const data = event.data.event as { type: string; payload: any }
 
       if (data.type === 'app:ready') {
         sendInit()
@@ -124,23 +217,17 @@ export function EmbeddedBridgeSurface() {
         })
           .then((res) => res.json())
           .then((response) => {
-            iframeRef.current?.contentWindow?.postMessage(
-              { type: 'host:tool-result', payload: { toolName, result: response.result } },
-              '*'
-            )
+            sendToApp({ type: 'host:tool-result', payload: { toolName, result: response.result } })
             // If the result contains auth state, forward that too
             if (response.result?.status && (toolName.includes('auth') || toolName.includes('connect'))) {
-              iframeRef.current?.contentWindow?.postMessage(
-                { type: 'host:auth-state', payload: response.result },
-                '*'
-              )
+              sendToApp({ type: 'host:auth-state', payload: response.result })
+            }
+            if (response.result?.authStartPath && response.result?.authStatusPath) {
+              void openAuthWindow(toolName, response.result.authStartPath, response.result.authStatusPath)
             }
           })
           .catch(() => {
-            iframeRef.current?.contentWindow?.postMessage(
-              { type: 'host:tool-result', payload: { toolName, result: { error: 'Tool request failed' } } },
-              '*'
-            )
+            sendToApp({ type: 'host:tool-result', payload: { toolName, result: { error: 'Tool request failed' } } })
           })
       }
 
@@ -169,12 +256,13 @@ export function EmbeddedBridgeSurface() {
     iframe.addEventListener('load', onLoad)
 
     return () => {
+      stopAuthPolling()
       window.removeEventListener('message', handler)
       iframe.removeEventListener('load', onLoad)
     }
-  }, [activeApp, activeAppSessionId])
+  }, [activeApp, activeAppSessionId, hasApprovedOrigin, toolInput])
 
-  if (!activeAppId || !activeApp) {
+  if (!activeAppId || !activeApp || !activeAppSessionId) {
     return null
   }
 
@@ -213,23 +301,32 @@ export function EmbeddedBridgeSurface() {
           <IconX size={14} />
         </ActionIcon>
       </Flex>
-      <iframe
-        ref={iframeRef}
-        src={buildAppUrl(activeApp.app_id, activeApp.entry_url, toolInput)}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-        referrerPolicy="no-referrer"
-        style={{
-          width: '100%',
-          flexGrow: 1,
-          border: 'none',
-          display: 'block',
-          overflow: 'visible',
-          pointerEvents: 'auto',
-          touchAction: 'auto',
-          userSelect: 'none',
-        }}
-        title={activeAppName || 'Bridge App'}
-      />
+      {hasApprovedOrigin ? (
+        <iframe
+          ref={iframeRef}
+          src={buildAppUrl(activeApp.entry_url, toolInput)}
+          sandbox="allow-scripts allow-forms allow-popups"
+          referrerPolicy="no-referrer"
+          style={{
+            width: '100%',
+            flexGrow: 1,
+            border: 'none',
+            display: 'block',
+            overflow: 'visible',
+            pointerEvents: 'auto',
+            touchAction: 'auto',
+            userSelect: 'none',
+          }}
+          title={activeAppName || 'Bridge App'}
+        />
+      ) : (
+        <Box p="md">
+          <Text size="sm" c="red" fw={600}>Blocked app origin mismatch</Text>
+          <Text size="xs" c="dimmed" mt={4}>
+            The registered app entry URL does not match its approved origin, so ChatBridge refused to mount it.
+          </Text>
+        </Box>
+      )}
     </Box>
   )
 }

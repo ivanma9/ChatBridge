@@ -4,6 +4,7 @@ export type AppOAuthState = 'disconnected' | 'connecting' | 'connected' | 'expir
 
 export interface AppAuthSnapshot {
   appId: string
+  clientId: string
   state: AppOAuthState
   grantedScopes: string[]
   updatedAt: number
@@ -27,6 +28,7 @@ export interface OAuthConfig {
 
 interface PendingAuth {
   appId: string
+  clientId: string
   state: string
   createdAt: number
 }
@@ -39,32 +41,37 @@ export class AppAuthBroker {
   private pendingAuths = new Map<string, PendingAuth>() // keyed by state param
   private oauthConfig: OAuthConfig | null = null
 
+  private key(appId: string, clientId: string): string {
+    return `${appId}:${clientId}`
+  }
+
   configureOAuth(config: OAuthConfig): void {
     this.oauthConfig = config
   }
 
-  getSnapshot(appId: string): AppAuthSnapshot | undefined {
-    return this.snapshots.get(appId)
+  getSnapshot(appId: string, clientId: string): AppAuthSnapshot | undefined {
+    return this.snapshots.get(this.key(appId, clientId))
   }
 
   setSnapshot(snapshot: AppAuthSnapshot): void {
-    this.snapshots.set(snapshot.appId, snapshot)
+    this.snapshots.set(this.key(snapshot.appId, snapshot.clientId), snapshot)
   }
 
-  clearSnapshot(appId: string): void {
-    this.snapshots.delete(appId)
+  clearSnapshot(appId: string, clientId: string): void {
+    this.snapshots.delete(this.key(appId, clientId))
   }
 
   // -- OAuth flow methods ---------------------------------------------
 
-  beginOAuth(appId: string): string {
+  beginOAuth(appId: string, clientId: string): string {
     if (!this.oauthConfig) throw new Error('OAuth not configured')
 
     const state = crypto.randomBytes(16).toString('hex')
-    this.pendingAuths.set(state, { appId, state, createdAt: Date.now() })
+    this.pendingAuths.set(state, { appId, clientId, state, createdAt: Date.now() })
 
     this.setSnapshot({
       appId,
+      clientId,
       state: 'connecting',
       grantedScopes: [],
       updatedAt: Date.now()
@@ -111,11 +118,12 @@ export class AppAuthBroker {
 
     if (!res.ok) {
       const errText = await res.text()
-      this.setSnapshot({
-        appId: pending.appId,
-        state: 'disconnected',
-        grantedScopes: [],
-        updatedAt: Date.now()
+        this.setSnapshot({
+          appId: pending.appId,
+          clientId: pending.clientId,
+          state: 'disconnected',
+          grantedScopes: [],
+          updatedAt: Date.now()
       })
       throw new Error(`Token exchange failed: ${errText}`)
     }
@@ -129,7 +137,7 @@ export class AppAuthBroker {
 
     const grantedScopes = data.scope ? data.scope.split(' ') : []
 
-    this.tokens.set(pending.appId, {
+    this.tokens.set(this.key(pending.appId, pending.clientId), {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresAt: Date.now() + data.expires_in * 1000,
@@ -138,6 +146,7 @@ export class AppAuthBroker {
 
     const snapshot: AppAuthSnapshot = {
       appId: pending.appId,
+      clientId: pending.clientId,
       state: 'connected',
       grantedScopes,
       updatedAt: Date.now()
@@ -153,6 +162,7 @@ export class AppAuthBroker {
       this.pendingAuths.delete(state)
       this.setSnapshot({
         appId: pending.appId,
+        clientId: pending.clientId,
         state: 'disconnected',
         grantedScopes: [],
         updatedAt: Date.now()
@@ -160,13 +170,13 @@ export class AppAuthBroker {
     }
   }
 
-  async getValidAccessToken(appId: string): Promise<string> {
-    const record = this.tokens.get(appId)
+  async getValidAccessToken(appId: string, clientId: string): Promise<string> {
+    const record = this.tokens.get(this.key(appId, clientId))
     if (!record) throw new Error('No token stored for app: ' + appId)
 
     if (Date.now() >= record.expiresAt - REFRESH_BUFFER_MS) {
-      await this.refreshAccessToken(appId)
-      const refreshed = this.tokens.get(appId)
+      await this.refreshAccessToken(appId, clientId)
+      const refreshed = this.tokens.get(this.key(appId, clientId))
       if (!refreshed) throw new Error('Token refresh failed for app: ' + appId)
       return refreshed.accessToken
     }
@@ -174,10 +184,10 @@ export class AppAuthBroker {
     return record.accessToken
   }
 
-  async refreshAccessToken(appId: string): Promise<void> {
+  async refreshAccessToken(appId: string, clientId: string): Promise<void> {
     if (!this.oauthConfig) throw new Error('OAuth not configured')
 
-    const record = this.tokens.get(appId)
+    const record = this.tokens.get(this.key(appId, clientId))
     if (!record) throw new Error('No token to refresh for app: ' + appId)
 
     const body = new URLSearchParams({
@@ -202,11 +212,12 @@ export class AppAuthBroker {
       // Refresh failed — mark as expired
       this.setSnapshot({
         appId,
+        clientId,
         state: 'expired',
         grantedScopes: record.grantedScopes,
         updatedAt: Date.now()
       })
-      this.tokens.delete(appId)
+      this.tokens.delete(this.key(appId, clientId))
       throw new Error('Token refresh failed')
     }
 
@@ -219,7 +230,7 @@ export class AppAuthBroker {
 
     const grantedScopes = data.scope ? data.scope.split(' ') : record.grantedScopes
 
-    this.tokens.set(appId, {
+    this.tokens.set(this.key(appId, clientId), {
       accessToken: data.access_token,
       refreshToken: data.refresh_token || record.refreshToken,
       expiresAt: Date.now() + data.expires_in * 1000,
@@ -228,14 +239,15 @@ export class AppAuthBroker {
 
     this.setSnapshot({
       appId,
+      clientId,
       state: 'connected',
       grantedScopes,
       updatedAt: Date.now()
     })
   }
 
-  disconnect(appId: string): void {
-    this.tokens.delete(appId)
-    this.snapshots.delete(appId)
+  disconnect(appId: string, clientId: string): void {
+    this.tokens.delete(this.key(appId, clientId))
+    this.snapshots.delete(this.key(appId, clientId))
   }
 }

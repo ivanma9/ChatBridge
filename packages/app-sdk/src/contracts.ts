@@ -16,6 +16,9 @@ export interface ChatBridgeAppManifest {
   tools: ChatBridgeToolManifest[]
 }
 
+export const CHATBRIDGE_PROTOCOL_VERSION = '1' as const
+export type ChatBridgeProtocolVersion = typeof CHATBRIDGE_PROTOCOL_VERSION
+
 export type ChatBridgeHostEventType =
   | 'host:init'
   | 'host:resume-session'
@@ -38,6 +41,7 @@ export type ChatBridgeHostEvent =
         appId: string
         appSessionId: string
         chatSessionId: string
+        input?: Record<string, unknown>
       }
     }
   | {
@@ -108,6 +112,13 @@ export type ChatBridgeAppEvent =
         message: string
       }
     }
+
+export interface ChatBridgeEnvelope<TEvent> {
+  protocolVersion: ChatBridgeProtocolVersion
+  appSessionId: string
+  nonce: string
+  event: TEvent
+}
 
 // ── Review & Registry Types ─────────────────────────────────────────
 

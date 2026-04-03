@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import * as registryRepo from '../db/repositories/registryRepository.js'
+import { AppProxyTargetError, extractProxySubPath, resolveApprovedAppTarget } from './appProxyTarget.js'
 
 export const appProxyRouter = Router()
 
@@ -7,6 +8,11 @@ export const appProxyRouter = Router()
 // This serves app content through the bridge origin so iframes work without cross-origin issues
 appProxyRouter.use('/:appId', async (req, res) => {
   try {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.status(405).json({ error: 'App proxy only supports GET and HEAD requests' })
+      return
+    }
+
     const entry = await registryRepo.findRegistryEntry(req.params.appId)
     if (!entry) {
       res.status(404).json({ error: 'App not found in registry' })
@@ -14,8 +20,8 @@ appProxyRouter.use('/:appId', async (req, res) => {
     }
 
     // Build the target URL: entry_url + the sub-path after /apps/:appId
-    const subPath = req.originalUrl.replace(`/apps/${req.params.appId}`, '') || '/'
-    const targetUrl = new URL(subPath, entry.entry_url).toString()
+    const subPath = extractProxySubPath(req.originalUrl, req.params.appId, '/apps')
+    const targetUrl = resolveApprovedAppTarget(entry.entry_url, entry.allowed_origin, subPath)
 
     // Fetch from the actual app server
     const appResponse = await fetch(targetUrl, {
@@ -35,6 +41,10 @@ appProxyRouter.use('/:appId', async (req, res) => {
     const buffer = Buffer.from(await appResponse.arrayBuffer())
     res.send(buffer)
   } catch (err) {
+    if (err instanceof AppProxyTargetError) {
+      res.status(400).json({ error: err.message })
+      return
+    }
     console.error(`[proxy] Error proxying to app ${req.params.appId}:`, err)
     res.status(502).json({ error: 'Failed to proxy to app' })
   }

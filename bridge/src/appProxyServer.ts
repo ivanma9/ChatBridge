@@ -1,14 +1,21 @@
 import express from 'express'
 import cors from 'cors'
 import { getDb } from './db/connection.js'
+import { AppProxyTargetError, extractProxySubPath, resolveApprovedAppTarget } from './admin/appProxyTarget.js'
+import { createBridgeCorsOptions } from './http/cors.js'
 
 const PROXY_PORT = parseInt(process.env.APP_PROXY_PORT || '3301', 10)
 
 const proxyApp = express()
-proxyApp.use(cors({ origin: true }))
+proxyApp.use(cors(createBridgeCorsOptions()))
 
 proxyApp.use('/:appId', async (req, res) => {
   try {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.status(405).json({ error: 'App proxy only supports GET and HEAD requests' })
+      return
+    }
+
     const entry = await getDb()
       .selectFrom('registry_entries')
       .selectAll()
@@ -20,8 +27,8 @@ proxyApp.use('/:appId', async (req, res) => {
       return
     }
 
-    const subPath = req.originalUrl.replace(`/${req.params.appId}`, '') || '/'
-    const targetUrl = new URL(subPath, entry.entry_url).toString()
+    const subPath = extractProxySubPath(req.originalUrl, req.params.appId, '')
+    const targetUrl = resolveApprovedAppTarget(entry.entry_url, entry.allowed_origin, subPath)
 
     const appResponse = await fetch(targetUrl, {
       method: req.method,
@@ -36,6 +43,10 @@ proxyApp.use('/:appId', async (req, res) => {
     res.status(appResponse.status)
     res.send(Buffer.from(await appResponse.arrayBuffer()))
   } catch (err) {
+    if (err instanceof AppProxyTargetError) {
+      res.status(400).json({ error: err.message })
+      return
+    }
     console.error('[app-proxy] Error:', err)
     res.status(502).json({ error: 'Proxy error' })
   }

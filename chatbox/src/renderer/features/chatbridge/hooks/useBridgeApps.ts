@@ -66,14 +66,6 @@ export function useLaunchApp() {
   const launch = useCallback(async (app: ActiveRegistryApp, toolInput?: Record<string, unknown>) => {
     await ensureBridgeClientSession()
 
-    // Show the app immediately
-    bridgeSurfaceStore.getState().setActiveApp({
-      activeAppId: app.app_id,
-      activeAppName: app.display_name,
-      activeAppSessionId: undefined,
-      toolInput,
-    })
-
     // Launch or resume session via bridge
     try {
       const res = await bridgeFetch(`${BRIDGE_URL}/api/sessions/launch`, {
@@ -97,7 +89,7 @@ export function useLaunchApp() {
         })
       }
     } catch {
-      // best-effort
+      bridgeSurfaceStore.getState().clearActiveApp()
     }
   }, [])
 

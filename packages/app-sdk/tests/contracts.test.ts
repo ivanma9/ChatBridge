@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  CHATBRIDGE_PROTOCOL_VERSION,
   TERMINAL_STATUSES,
   VALID_TRANSITIONS,
   type ApprovalStatus,
@@ -14,6 +15,7 @@ import {
   type AppSessionStatus,
   type DiffResult,
   type DiffChange,
+  type ChatBridgeEnvelope,
 } from '../src/contracts'
 
 describe('ApprovalStatus', () => {
@@ -102,6 +104,20 @@ describe('ActiveRegistryApp', () => {
     }
     expect(entry.display_description).toBeNull()
     expect(entry.display_category).toBeNull()
+  })
+})
+
+describe('ChatBridgeEnvelope', () => {
+  it('uses the shared protocol version constant', () => {
+    const envelope: ChatBridgeEnvelope<{ type: 'app:ready' }> = {
+      protocolVersion: CHATBRIDGE_PROTOCOL_VERSION,
+      appSessionId: 'session-123',
+      nonce: 'nonce-123',
+      event: { type: 'app:ready' },
+    }
+
+    expect(envelope.protocolVersion).toBe('1')
+    expect(envelope.nonce).toBe('nonce-123')
   })
 })
 

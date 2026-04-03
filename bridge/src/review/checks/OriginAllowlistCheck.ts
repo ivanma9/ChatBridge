@@ -35,7 +35,7 @@ export async function runOriginAllowlistCheck(manifest: ChatBridgeAppManifest): 
       if (entryOrigin !== origin) {
         findings.push({
           ...base,
-          severity: 'high',
+          severity: 'critical',
           title: 'entryUrl origin mismatch',
           description: `The entryUrl origin "${entryOrigin}" does not match the declared origin "${origin}". This may indicate a cross-origin embedding risk.`,
           affected_path: 'entryUrl',

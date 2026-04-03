@@ -192,11 +192,18 @@
       var hostOrigin = null;
       var appSessionId = null;
       var chatSessionId = null;
+      var messageNonce = null;
+      var protocolVersion = '1';
 
       // ── Bridge helpers ────────────────────────────────────────────────
       function send(event) {
-        if (window.parent !== window && hostOrigin) {
-          window.parent.postMessage(event, hostOrigin);
+        if (window.parent !== window && hostOrigin && appSessionId && messageNonce) {
+          window.parent.postMessage({
+            protocolVersion: protocolVersion,
+            appSessionId: appSessionId,
+            nonce: messageNonce,
+            event: event
+          }, hostOrigin);
         }
         bridgeLog('↑ ' + event.type);
       }
@@ -573,7 +580,10 @@
 
       // ── Bridge listener ───────────────────────────────────────────────
       window.addEventListener('message', function(e) {
-        var msg = e.data;
+        var envelope = e.data;
+        if (!envelope || envelope.protocolVersion !== protocolVersion || !envelope.event || !envelope.nonce) return;
+
+        var msg = envelope.event;
         if (!msg || !msg.type) return;
 
         bridgeLog('↓ ' + msg.type);
@@ -581,8 +591,9 @@
         switch (msg.type) {
           case 'host:init':
             hostOrigin = e.origin;
-            appSessionId = msg.payload.appSessionId;
+            appSessionId = envelope.appSessionId;
             chatSessionId = msg.payload.chatSessionId;
+            messageNonce = envelope.nonce;
             send({ type: 'app:ready', payload: { appId: APP_ID, version: APP_VERSION } });
             initBoard();
             startNewGame();
@@ -590,7 +601,8 @@
 
           case 'host:resume-session':
             hostOrigin = e.origin;
-            appSessionId = msg.payload.appSessionId;
+            appSessionId = envelope.appSessionId;
+            messageNonce = envelope.nonce;
             send({ type: 'app:ready', payload: { appId: APP_ID, version: APP_VERSION } });
             initBoard();
             if (!restoreState(msg.payload.state)) {
