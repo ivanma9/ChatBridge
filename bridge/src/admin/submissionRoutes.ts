@@ -38,6 +38,11 @@ submissionRouter.post('/', async (req, res) => {
       res.status(400).json({ error: err.message })
       return
     }
+    const pgErr = err as any
+    if (pgErr.code === '23505') {
+      res.status(409).json({ error: `Duplicate: ${pgErr.detail || 'This app version already exists'}` })
+      return
+    }
     console.error('[submissions] Create error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }

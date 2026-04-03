@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatBridge Admin</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f5f5f5; color: #1a1a1a; line-height: 1.5; }
+
+    /* Header */
+    header { background: #1a1a2e; color: #fff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header .key-input { display: flex; gap: 8px; align-items: center; }
+    header input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 13px; width: 280px; }
+    header input::placeholder { color: rgba(255,255,255,0.4); }
+
+    /* Layout */
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+    /* Actions bar */
+    .actions { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; }
+    .actions select, .actions input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; background: #fff; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-success { background: #16a34a; color: #fff; }
+    .btn-success:hover { background: #15803d; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-secondary { background: #e5e7eb; color: #374151; }
+    .btn-secondary:hover { background: #d1d5db; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    th { background: #f9fafb; text-align: left; padding: 10px 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+    td { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 14px; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover { background: #f9fafb; }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .badge-draft { background: #e5e7eb; color: #374151; }
+    .badge-pending_checks { background: #fef3c7; color: #92400e; }
+    .badge-pending_review { background: #dbeafe; color: #1e40af; }
+    .badge-approved { background: #dcfce7; color: #166534; }
+    .badge-rejected { background: #fee2e2; color: #991b1b; }
+    .badge-suspended { background: #fce7f3; color: #9d174d; }
+    .badge-superseded { background: #f3f4f6; color: #6b7280; }
+    .badge-low { background: #dcfce7; color: #166534; }
+    .badge-medium { background: #fef3c7; color: #92400e; }
+    .badge-high { background: #fed7aa; color: #9a3412; }
+    .badge-critical { background: #fee2e2; color: #991b1b; }
+
+    /* Expandable detail */
+    .detail-row { display: none; }
+    .detail-row.open { display: table-row; }
+    .detail-row td { background: #fafbfc; padding: 16px 24px; }
+    .detail-content { max-width: 100%; }
+    .detail-content h3 { font-size: 14px; margin: 12px 0 6px; color: #374151; }
+    .detail-content h3:first-child { margin-top: 0; }
+    .findings-list { list-style: none; padding: 0; }
+    .findings-list li { padding: 6px 0; border-bottom: 1px solid #f3f4f6; font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+    .findings-list li:last-child { border-bottom: none; }
+
+    /* Diff */
+    .diff-change { padding: 4px 8px; margin: 2px 0; border-radius: 4px; font-size: 13px; font-family: monospace; }
+    .diff-added { background: #dcfce7; }
+    .diff-removed { background: #fee2e2; }
+    .diff-modified { background: #fef3c7; }
+
+    /* Decision form */
+    .decision-form { margin-top: 12px; padding: 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
+    .decision-form textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; resize: vertical; min-height: 60px; margin: 8px 0; font-family: inherit; }
+    .decision-form .btn-group { display: flex; gap: 8px; }
+
+    /* Submit modal */
+    .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+    .modal-backdrop.open { display: flex; }
+    .modal { background: #fff; border-radius: 12px; padding: 24px; width: 600px; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal h2 { font-size: 16px; margin-bottom: 16px; }
+    .modal label { display: block; font-size: 13px; font-weight: 500; margin: 10px 0 4px; color: #374151; }
+    .modal textarea, .modal input[type=text] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: monospace; }
+    .modal textarea { min-height: 200px; resize: vertical; }
+    .modal .btn-group { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+    /* Registry section */
+    .section-label { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #6b7280; margin: 24px 0 8px; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 14px; z-index: 200; opacity: 0; transition: opacity 0.3s; }
+    .toast.show { opacity: 1; }
+    .toast-success { background: #16a34a; }
+    .toast-error { background: #dc2626; }
+
+    .empty { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ChatBridge Review Admin</h1>
+    <div class="key-input">
+      <input type="password" id="apiKey" placeholder="Admin API Key" value="dev-admin-key-change-in-production">
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="actions">
+      <select id="statusFilter">
+        <option value="">All statuses</option>
+        <option value="draft">Draft</option>
+        <option value="pending_checks">Pending Checks</option>
+        <option value="pending_review">Pending Review</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="suspended">Suspended</option>
+        <option value="superseded">Superseded</option>
+      </select>
+      <button class="btn btn-primary" onclick="loadSubmissions()">Refresh</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" onclick="openSubmitModal()">+ Submit New App</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>App</th>
+          <th>Version</th>
+          <th>Status</th>
+          <th>Risk</th>
+          <th>Update</th>
+          <th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody id="submissionList"></tbody>
+    </table>
+
+    <div class="section-label" style="margin-top:32px;">Active Registry</div>
+    <table>
+      <thead>
+        <tr>
+          <th>App</th>
+          <th>Category</th>
+          <th>Tools</th>
+          <th>Entry URL</th>
+          <th>Activated</th>
+        </tr>
+      </thead>
+      <tbody id="registryList"></tbody>
+    </table>
+  </div>
+
+  <!-- Submit Modal -->
+  <div class="modal-backdrop" id="submitModal">
+    <div class="modal">
+      <h2>Submit New App for Review</h2>
+      <label>Manifest JSON</label>
+      <textarea id="manifestInput" placeholder='{
+  "id": "my-app",
+  "version": "1.0.0",
+  "name": "My App",
+  "description": "Description",
+  "entryUrl": "http://localhost:3201",
+  "origin": "http://localhost:3201",
+  "permissions": [],
+  "scopes": [],
+  "tools": []
+}'></textarea>
+      <label>Vendor Name</label>
+      <input type="text" id="vendorInput" value="ChatBridge Dev Team">
+      <label>Category</label>
+      <input type="text" id="categoryInput" value="education">
+      <div class="btn-group">
+        <button class="btn btn-secondary" onclick="closeSubmitModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitApp()">Submit for Review</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API = ''
+    const key = () => document.getElementById('apiKey').value
+    const headers = () => ({ 'Content-Type': 'application/json', 'X-Admin-Key': key() })
+
+    let expandedId = null
+
+    function toast(msg, type = 'success') {
+      const el = document.getElementById('toast')
+      el.textContent = msg
+      el.className = `toast toast-${type} show`
+      setTimeout(() => el.className = 'toast', 3000)
+    }
+
+    function badge(value, prefix = '') {
+      if (!value) return ''
+      return `<span class="badge badge-${value}">${value}</span>`
+    }
+
+    function timeAgo(iso) {
+      const d = new Date(iso)
+      const now = new Date()
+      const diff = Math.floor((now - d) / 1000)
+      if (diff < 60) return 'just now'
+      if (diff < 3600) return `${Math.floor(diff/60)}m ago`
+      if (diff < 86400) return `${Math.floor(diff/3600)}h ago`
+      return d.toLocaleDateString()
+    }
+
+    async function loadSubmissions() {
+      const status = document.getElementById('statusFilter').value
+      const qs = status ? `?status=${status}` : ''
+      try {
+        const res = await fetch(`${API}/api/admin/submissions${qs}`, { headers: headers() })
+        const data = await res.json()
+        const tbody = document.getElementById('submissionList')
+
+        if (!data.submissions || data.submissions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty">No submissions found</td></tr>'
+          return
+        }
+
+        let html = ''
+        for (const s of data.submissions) {
+          const rowId = `row-${s.id}`
+          const detailId = `detail-${s.id}`
+          const isOpen = expandedId === s.id
+          html += `
+            <tr class="clickable" onclick="toggleDetail('${s.id}')">
+              <td><strong>${s.app_id.slice(0,8)}...</strong></td>
+              <td>${s.version_id.slice(0,8)}...</td>
+              <td>${badge(s.status)}</td>
+              <td>${s.risk_level ? badge(s.risk_level) : '—'}</td>
+              <td>${s.is_update ? 'Yes' : 'New'}</td>
+              <td>${timeAgo(s.submitted_at)}</td>
+            </tr>
+            <tr class="detail-row ${isOpen ? 'open' : ''}" id="${detailId}">
+              <td colspan="6"><div class="detail-content" id="content-${s.id}">Loading...</div></td>
+            </tr>`
+        }
+        tbody.innerHTML = html
+        if (expandedId) loadDetail(expandedId)
+      } catch (e) {
+        toast('Failed to load submissions: ' + e.message, 'error')
+      }
+    }
+
+    async function toggleDetail(id) {
+      const row = document.getElementById(`detail-${id}`)
+      if (expandedId === id) {
+        row.classList.remove('open')
+        expandedId = null
+        return
+      }
+      if (expandedId) {
+        const prev = document.getElementById(`detail-${expandedId}`)
+        if (prev) prev.classList.remove('open')
+      }
+      expandedId = id
+      row.classList.add('open')
+      loadDetail(id)
+    }
+
+    async function loadDetail(id) {
+      const el = document.getElementById(`content-${id}`)
+      try {
+        const res = await fetch(`${API}/api/admin/submissions/${id}`, { headers: headers() })
+        const d = await res.json()
+
+        let html = ''
+
+        // App info
+        if (d.app) {
+          html += `<h3>App: ${d.app.display_name}</h3>
+            <p style="font-size:13px;color:#6b7280">ID: ${d.app.external_id} &middot; Vendor: ${d.app.vendor_name}</p>`
+        }
+
+        // Version info
+        if (d.version) {
+          html += `<h3>Version ${d.version.version_identifier}</h3>
+            <p style="font-size:13px">Permissions: ${JSON.stringify(d.version.manifest?.permissions || [])} &middot;
+            Scopes: ${JSON.stringify(d.version.manifest?.scopes || [])} &middot;
+            Tools: ${(d.version.manifest?.tools || []).map(t => t.name).join(', ') || 'none'}</p>`
+        }
+
+        // Diff (for updates)
+        if (d.diff && d.diff.changes && d.diff.changes.length > 0) {
+          html += `<h3>Changes (${d.diff.summary.total_changes} total, ${d.diff.summary.risk_sensitive_changes} risk-sensitive)</h3>`
+          for (const c of d.diff.changes) {
+            const cls = c.kind === 'added' ? 'diff-added' : c.kind === 'removed' ? 'diff-removed' : 'diff-modified'
+            html += `<div class="diff-change ${cls}">
+              <strong>${c.kind}</strong> ${c.path} ${badge(c.risk_category)}
+              <span style="color:#6b7280;margin-left:8px">${c.risk_reason}</span>
+            </div>`
+          }
+        }
+
+        // Findings
+        html += `<h3>Findings (${d.findings.length})</h3>`
+        if (d.findings.length === 0) {
+          html += '<p style="font-size:13px;color:#9ca3af">No findings — clean submission</p>'
+        } else {
+          html += '<ul class="findings-list">'
+          for (const f of d.findings) {
+            const ctx = f.change_context ? ` <span style="color:#9ca3af">(${f.change_context})</span>` : ''
+            html += `<li>${badge(f.severity)} <strong>${f.title}</strong>${ctx}<br><span style="color:#6b7280">${f.description}</span></li>`
+          }
+          html += '</ul>'
+        }
+
+        // Decision
+        if (d.decision) {
+          html += `<h3>Decision</h3>
+            <p style="font-size:13px">${badge(d.decision.decision)} by ${d.decision.reviewer_id} &middot; "${d.decision.rationale}"</p>`
+        }
+
+        // Action buttons
+        const status = d.submission.status
+        if (status === 'draft') {
+          html += `<div style="margin-top:12px">
+            <button class="btn btn-primary btn-sm" onclick="initiateReview('${id}')">Initiate Review</button>
+          </div>`
+        } else if (status === 'pending_checks') {
+          html += `<div style="margin-top:12px">
+            <button class="btn btn-secondary btn-sm" onclick="retryChecks('${id}')">Retry Checks</button>
+          </div>`
+        } else if (status === 'pending_review') {
+          html += `<div class="decision-form">
+            <strong>Review Decision</strong>
+            <textarea id="rationale-${id}" placeholder="Enter your rationale..."></textarea>
+            <div class="btn-group">
+              <button class="btn btn-success btn-sm" onclick="decide('${id}','approved')">Approve</button>
+              <button class="btn btn-danger btn-sm" onclick="decide('${id}','rejected')">Reject</button>
+            </div>
+          </div>`
+        } else if (status === 'approved') {
+          html += `<div style="margin-top:12px">
+            <button class="btn btn-danger btn-sm" onclick="suspendVersion('${d.submission.version_id}')">Suspend Version</button>
+          </div>`
+        }
+
+        el.innerHTML = html
+      } catch (e) {
+        el.innerHTML = `<p style="color:#dc2626">Error loading details: ${e.message}</p>`
+      }
+    }
+
+    async function initiateReview(id) {
+      try {
+        await fetch(`${API}/api/admin/submissions/${id}/initiate-review`, { method: 'POST', headers: headers() })
+        toast('Review initiated — automated checks running')
+        loadSubmissions()
+      } catch (e) { toast(e.message, 'error') }
+    }
+
+    async function retryChecks(id) {
+      try {
+        await fetch(`${API}/api/admin/submissions/${id}/retry-checks`, { method: 'POST', headers: headers() })
+        toast('Checks retried')
+        loadSubmissions()
+      } catch (e) { toast(e.message, 'error') }
+    }
+
+    async function decide(id, decision) {
+      const rationale = document.getElementById(`rationale-${id}`).value.trim()
+      if (!rationale) { toast('Rationale is required', 'error'); return }
+      try {
+        const res = await fetch(`${API}/api/admin/submissions/${id}/decide`, {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ decision, rationale, findings_considered: [] })
+        })
+        const data = await res.json()
+        if (!res.ok) { toast(data.error || 'Failed', 'error'); return }
+        toast(`Submission ${decision}`)
+        expandedId = id
+        loadSubmissions()
+        loadRegistry()
+      } catch (e) { toast(e.message, 'error') }
+    }
+
+    async function suspendVersion(versionId) {
+      const rationale = prompt('Suspension rationale:')
+      if (!rationale) return
+      try {
+        const res = await fetch(`${API}/api/admin/versions/${versionId}/suspend`, {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ rationale })
+        })
+        if (!res.ok) { const d = await res.json(); toast(d.error, 'error'); return }
+        toast('Version suspended')
+        loadSubmissions()
+        loadRegistry()
+      } catch (e) { toast(e.message, 'error') }
+    }
+
+    // Submit modal
+    function openSubmitModal() { document.getElementById('submitModal').classList.add('open') }
+    function closeSubmitModal() { document.getElementById('submitModal').classList.remove('open') }
+
+    async function submitApp() {
+      let manifest
+      try {
+        manifest = JSON.parse(document.getElementById('manifestInput').value)
+      } catch (e) { toast('Invalid JSON: ' + e.message, 'error'); return }
+
+      const vendor_name = document.getElementById('vendorInput').value
+      const category = document.getElementById('categoryInput').value
+
+      try {
+        const res = await fetch(`${API}/api/admin/submissions`, {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ manifest, metadata: { vendor_name, category } })
+        })
+        const data = await res.json()
+        if (!res.ok) { toast(data.error || 'Submit failed', 'error'); return }
+        toast(`Submitted! ID: ${data.submission_id.slice(0,8)}...`)
+        closeSubmitModal()
+        loadSubmissions()
+      } catch (e) { toast(e.message, 'error') }
+    }
+
+    // Registry
+    async function loadRegistry() {
+      try {
+        const res = await fetch(`${API}/api/registry/active`)
+        const data = await res.json()
+        const tbody = document.getElementById('registryList')
+
+        if (!data.apps || data.apps.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty">No active apps</td></tr>'
+          return
+        }
+
+        tbody.innerHTML = data.apps.map(a => `
+          <tr>
+            <td><strong>${a.display_name}</strong><br><span style="font-size:12px;color:#6b7280">${a.display_description || ''}</span></td>
+            <td>${a.display_category || '—'}</td>
+            <td>${a.tools.map(t => `<code style="font-size:12px;background:#f3f4f6;padding:1px 4px;border-radius:3px">${t.name}</code>`).join(' ')}</td>
+            <td style="font-size:12px;font-family:monospace">${a.entry_url}</td>
+            <td>${timeAgo(a.activated_at)}</td>
+          </tr>
+        `).join('')
+      } catch (e) {
+        document.getElementById('registryList').innerHTML = '<tr><td colspan="5" class="empty">Failed to load registry</td></tr>'
+      }
+    }
+
+    // Init
+    loadSubmissions()
+    loadRegistry()
+    document.getElementById('statusFilter').addEventListener('change', loadSubmissions)
+  </script>
+</body>
+</html>
