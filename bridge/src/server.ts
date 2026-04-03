@@ -11,6 +11,7 @@ import { registryRouter } from './admin/registryRoutes.js'
 import { historyRouter } from './admin/historyRoutes.js'
 import { appProxyRouter } from './admin/appProxyRoutes.js'
 import { AppAuthBroker } from './auth/AppAuthBroker.js'
+import { createBridgeClientSession, isValidClientId } from './auth/BridgeClientSession.js'
 import { createSpotifyRouter } from './auth/OAuthCallbackServer.js'
 
 const PORT = parseInt(process.env.PORT || '3300', 10)
@@ -36,6 +37,12 @@ app.use('/admin', express.static(path.join(__dirname, 'admin', 'public')))
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', db: dbReady })
+})
+
+app.post('/api/bridge/session', (req, res) => {
+  const clientId = isValidClientId(req.body?.client_id) ? req.body.client_id : undefined
+  const session = createBridgeClientSession(clientId)
+  res.json(session)
 })
 
 // Spotify OAuth & API proxy
