@@ -148,3 +148,37 @@ registryRouter.get('/sessions/:appSessionId/status', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' })
   }
 })
+
+// PUT /api/sessions/:appSessionId/state — Save app state
+registryRouter.put('/sessions/:appSessionId/state', async (req, res) => {
+  try {
+    const session = await registryRepo.findAppSession(req.params.appSessionId)
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' })
+      return
+    }
+
+    const { state } = req.body
+    if (state === undefined) {
+      res.status(400).json({ error: 'state is required' })
+      return
+    }
+
+    await registryRepo.saveSessionState(session.id, state)
+    res.json({ saved: true })
+  } catch (err) {
+    console.error('[sessions] Save state error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// GET /api/sessions/:appSessionId/state — Load app state
+registryRouter.get('/sessions/:appSessionId/state', async (req, res) => {
+  try {
+    const state = await registryRepo.getSessionState(req.params.appSessionId)
+    res.json({ state })
+  } catch (err) {
+    console.error('[sessions] Load state error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})

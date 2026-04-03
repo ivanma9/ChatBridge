@@ -76,3 +76,17 @@ export async function findAppSessionByChatAndApp(chatSessionId: string, appId: s
     .where('app_id', '=', appId)
     .executeTakeFirst()
 }
+
+export async function saveSessionState(sessionId: string, state: unknown): Promise<AppSessionsTable> {
+  return getDb()
+    .updateTable('app_sessions')
+    .set({ state: JSON.stringify(state) as any, updated_at: new Date() as any })
+    .where('id', '=', sessionId)
+    .returningAll()
+    .executeTakeFirstOrThrow()
+}
+
+export async function getSessionState(sessionId: string): Promise<unknown | null> {
+  const session = await findAppSession(sessionId)
+  return session?.state ?? null
+}

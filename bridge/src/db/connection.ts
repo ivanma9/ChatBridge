@@ -89,7 +89,9 @@ export interface AppSessionsTable {
   chat_session_id: string
   app_id: string
   pinned_version_id: string
+  state: unknown | null
   created_at: Date
+  updated_at: Date
 }
 
 let db: Kysely<Database> | null = null
