@@ -4,7 +4,7 @@ import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { initDb } from './db/connection.js'
-import { adminAuth } from './admin/authMiddleware.js'
+import { adminAuth, bridgeAuth } from './admin/authMiddleware.js'
 import { submissionRouter } from './admin/submissionRoutes.js'
 import { decisionRouter } from './admin/decisionRoutes.js'
 import { registryRouter } from './admin/registryRoutes.js'
@@ -61,7 +61,7 @@ if (spotifyClientId && spotifyClientSecret) {
 import { executeToolRequest } from './orchestration/ToolMediator.js'
 import './orchestration/handlers/authHandler.js' // register built-in handlers
 
-app.post('/api/tools/execute', async (req, res) => {
+app.post('/api/tools/execute', bridgeAuth, async (req, res) => {
   try {
     const { app_id, tool_name, args, session_id } = req.body
     if (!app_id || !tool_name) {
@@ -77,7 +77,7 @@ app.post('/api/tools/execute', async (req, res) => {
 })
 
 // Keep legacy endpoint for backwards compatibility
-app.post('/api/app-tool/:toolName', async (req, res) => {
+app.post('/api/app-tool/:toolName', bridgeAuth, async (req, res) => {
   const { app_id, args, session_id } = req.body
   const result = await executeToolRequest({ app_id, tool_name: req.params.toolName, args: args || {}, session_id })
   res.json(result)
