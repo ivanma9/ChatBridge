@@ -17,7 +17,7 @@ const SEED_APPS = [
       origin: 'http://localhost:3201',
       permissions: [],
       scopes: [],
-      tools: [{ name: 'quiz_start', description: 'Start a quiz', inputSchema: {} }],
+      tools: [{ name: 'launch_quiz', description: 'Launch a quiz on a given topic', inputSchema: { type: 'object', properties: { topic: { type: 'string', description: 'The quiz topic, e.g. Geography, Science, History' } }, required: ['topic'] } }],
     },
   },
   {
@@ -67,7 +67,7 @@ const SEED_APPS = [
       entryUrl: 'http://localhost:3204',
       origin: 'http://localhost:3204',
       permissions: [],
-      scopes: ['playlist-read-private', 'user-read-email'],
+      scopes: ['playlist-read-private', 'playlist-modify-private', 'user-read-email'],
       tools: [{ name: 'spotify_search', description: 'Search for music', inputSchema: { type: 'object', properties: { query: { type: 'string' } } } }],
     },
   },

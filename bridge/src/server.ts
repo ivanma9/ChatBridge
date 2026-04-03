@@ -10,6 +10,8 @@ import { decisionRouter } from './admin/decisionRoutes.js'
 import { registryRouter } from './admin/registryRoutes.js'
 import { historyRouter } from './admin/historyRoutes.js'
 import { appProxyRouter } from './admin/appProxyRoutes.js'
+import { AppAuthBroker } from './auth/AppAuthBroker.js'
+import { createSpotifyRouter } from './auth/OAuthCallbackServer.js'
 
 const PORT = parseInt(process.env.PORT || '3300', 10)
 
@@ -36,6 +38,25 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', db: dbReady })
 })
 
+// Spotify OAuth & API proxy
+const spotifyClientId = process.env.SPOTIFY_CLIENT_ID
+const spotifyClientSecret = process.env.SPOTIFY_CLIENT_SECRET
+if (spotifyClientId && spotifyClientSecret) {
+  const broker = new AppAuthBroker()
+  broker.configureOAuth({
+    clientId: spotifyClientId,
+    clientSecret: spotifyClientSecret,
+    redirectUri: process.env.SPOTIFY_REDIRECT_URI || `http://127.0.0.1:${PORT}/auth/spotify/callback`,
+    authorizationUrl: 'https://accounts.spotify.com/authorize',
+    tokenUrl: 'https://accounts.spotify.com/api/token',
+    scopes: ['playlist-read-private', 'playlist-modify-private', 'user-read-email']
+  })
+  app.use(createSpotifyRouter(broker))
+  console.log('[bridge] Spotify OAuth routes enabled')
+} else {
+  console.warn('[bridge] Spotify OAuth disabled — missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET')
+}
+
 // Review & registry routes (require DB)
 if (dbReady) {
   app.use('/api/admin/submissions', adminAuth, submissionRouter)
@@ -44,6 +65,11 @@ if (dbReady) {
   app.use('/api/registry', registryRouter)
   app.use('/api', registryRouter)
   app.use('/apps', appProxyRouter)
+
+  // Start app proxy on separate port (different origin for iframe isolation)
+  import('./appProxyServer.js').then(({ startAppProxyServer }) => {
+    startAppProxyServer()
+  })
 }
 
 app.listen(PORT, () => {

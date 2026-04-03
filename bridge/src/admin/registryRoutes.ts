@@ -62,8 +62,12 @@ registryRouter.post('/sessions/launch', async (req, res) => {
       return
     }
 
-    // Check for existing session
-    const existing = await registryRepo.findAppSessionByChatAndApp(chat_session_id, app_id)
+    // Check for existing session (same chat+app, or any session with saved state)
+    let existing = await registryRepo.findAppSessionByChatAndApp(chat_session_id, app_id)
+    if (!existing) {
+      // Look for any previous session with saved state for this app
+      existing = (await registryRepo.findLatestSessionWithState(app_id)) || null
+    }
     if (existing) {
       const entry = await registryRepo.findRegistryEntry(app_id)
       if (!entry) {

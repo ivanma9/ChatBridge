@@ -90,3 +90,13 @@ export async function getSessionState(sessionId: string): Promise<unknown | null
   const session = await findAppSession(sessionId)
   return session?.state ?? null
 }
+
+export async function findLatestSessionWithState(appId: string): Promise<AppSessionsTable | undefined> {
+  return getDb()
+    .selectFrom('app_sessions')
+    .selectAll()
+    .where('app_id', '=', appId)
+    .where('state', 'is not', null)
+    .orderBy('updated_at', 'desc')
+    .executeTakeFirst()
+}
