@@ -57,20 +57,30 @@ if (spotifyClientId && spotifyClientSecret) {
   console.warn('[bridge] Spotify OAuth disabled — missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET')
 }
 
-// App tool requests (OAuth, API proxying)
-app.post('/api/app-tool/:toolName', express.json(), (req, res) => {
-  const { toolName } = req.params
-  const { app_id, args } = req.body
+// Generic tool mediation — any app's tool requests go through here
+import { executeToolRequest } from './orchestration/ToolMediator.js'
+import './orchestration/handlers/authHandler.js' // register built-in handlers
 
-  // Spotify auth: return the auth start URL
-  if (toolName === 'request_spotify_auth') {
-    const authUrl = `http://localhost:${PORT}/auth/spotify/start`
-    res.json({ status: 'connecting', scopes: [], authUrl })
-    return
+app.post('/api/tools/execute', async (req, res) => {
+  try {
+    const { app_id, tool_name, args, session_id } = req.body
+    if (!app_id || !tool_name) {
+      res.status(400).json({ error: 'app_id and tool_name are required' })
+      return
+    }
+    const result = await executeToolRequest({ app_id, tool_name, args: args || {}, session_id })
+    res.json(result)
+  } catch (err) {
+    console.error('[tools] Execute error:', err)
+    res.status(500).json({ error: 'Tool execution failed' })
   }
+})
 
-  // Default: tool not implemented
-  res.status(404).json({ error: `Tool ${toolName} not implemented` })
+// Keep legacy endpoint for backwards compatibility
+app.post('/api/app-tool/:toolName', async (req, res) => {
+  const { app_id, args, session_id } = req.body
+  const result = await executeToolRequest({ app_id, tool_name: req.params.toolName, args: args || {}, session_id })
+  res.json(result)
 })
 
 // Review & registry routes (require DB)
