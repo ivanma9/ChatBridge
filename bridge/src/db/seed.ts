@@ -2,24 +2,22 @@ import 'dotenv/config'
 import { initDb, destroyDb, getDb } from './connection.js'
 import { sql } from 'kysely'
 
-const SEED_APPS = [
-  {
-    external_id: 'mock-app',
-    display_name: 'Quiz Mock App',
-    vendor_name: 'ChatBridge Dev Team',
-    category: 'education',
-    manifest: {
-      id: 'mock-app',
-      version: '1.0.0',
-      name: 'Quiz Mock App',
-      description: 'A quiz app for testing the bridge pipeline',
-      entryUrl: 'http://localhost:3201',
-      origin: 'http://localhost:3201',
-      permissions: [],
-      scopes: [],
-      tools: [{ name: 'launch_quiz', description: 'Launch a quiz on a given topic', inputSchema: { type: 'object', properties: { topic: { type: 'string', description: 'The quiz topic, e.g. Geography, Science, History' } }, required: ['topic'] } }],
-    },
+const APP_URLS: Record<string, { entryUrl: string; origin: string }> = {
+  chess: {
+    entryUrl: process.env.CHESS_APP_URL || 'https://chess-lac-beta.vercel.app',
+    origin: process.env.CHESS_APP_URL || 'https://chess-lac-beta.vercel.app',
   },
+  weather: {
+    entryUrl: process.env.WEATHER_APP_URL || 'https://weather-app-one-ecru-12.vercel.app',
+    origin: process.env.WEATHER_APP_URL || 'https://weather-app-one-ecru-12.vercel.app',
+  },
+  spotify: {
+    entryUrl: process.env.SPOTIFY_APP_URL || 'https://spotify-zeta-green.vercel.app',
+    origin: process.env.SPOTIFY_APP_URL || 'https://spotify-zeta-green.vercel.app',
+  },
+}
+
+const SEED_APPS = [
   {
     external_id: 'chess',
     display_name: 'Chess',
@@ -30,8 +28,8 @@ const SEED_APPS = [
       version: '1.0.0',
       name: 'Chess',
       description: 'Play chess within the chat',
-      entryUrl: 'http://localhost:3202',
-      origin: 'http://localhost:3202',
+      entryUrl: APP_URLS.chess.entryUrl,
+      origin: APP_URLS.chess.origin,
       permissions: [],
       scopes: [],
       tools: [
@@ -50,8 +48,8 @@ const SEED_APPS = [
       version: '1.0.0',
       name: 'Weather',
       description: 'Check current weather conditions',
-      entryUrl: 'http://localhost:3203',
-      origin: 'http://localhost:3203',
+      entryUrl: APP_URLS.weather.entryUrl,
+      origin: APP_URLS.weather.origin,
       permissions: ['geolocation'],
       scopes: [],
       tools: [{ name: 'weather_check', description: 'Check weather for a location', inputSchema: { type: 'object', properties: { location: { type: 'string' } } } }],
@@ -67,8 +65,8 @@ const SEED_APPS = [
       version: '1.0.0',
       name: 'Spotify',
       description: 'Browse and play music from Spotify',
-      entryUrl: 'http://localhost:3204',
-      origin: 'http://localhost:3204',
+      entryUrl: APP_URLS.spotify.entryUrl,
+      origin: APP_URLS.spotify.origin,
       permissions: [],
       scopes: ['playlist-read-private', 'playlist-modify-private', 'user-read-email'],
       tools: [
@@ -83,6 +81,10 @@ const SEED_APPS = [
 async function seed() {
   const db = initDb()
   console.log('[seed] Connected to database')
+
+  // Clear existing data for a clean reseed
+  await sql`TRUNCATE registry_entries, review_decisions, app_sessions, app_submissions, app_versions, apps CASCADE`.execute(db)
+  console.log('[seed] Cleared existing data')
 
   for (const app of SEED_APPS) {
     // Check if app already exists
