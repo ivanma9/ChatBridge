@@ -305,7 +305,7 @@ export function EmbeddedBridgeSurface() {
         <iframe
           ref={iframeRef}
           src={buildAppUrl(activeApp.entry_url, toolInput)}
-          sandbox="allow-scripts allow-forms allow-popups"
+          sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
           referrerPolicy="no-referrer"
           style={{
             width: '100%',

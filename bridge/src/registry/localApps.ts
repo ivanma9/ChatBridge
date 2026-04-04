@@ -6,8 +6,8 @@ export const localAppManifests: ChatBridgeAppManifest[] = [
     version: '0.1.0',
     name: 'Chess',
     description: 'Interactive chess app embedded inside the host chat.',
-    entryUrl: 'http://localhost:3202',
-    origin: 'http://localhost:3202',
+    entryUrl: process.env.CHESS_APP_URL || 'http://localhost:3202',
+    origin: process.env.CHESS_APP_URL || 'http://localhost:3202',
     permissions: ['session:write'],
     scopes: [],
     tools: [
