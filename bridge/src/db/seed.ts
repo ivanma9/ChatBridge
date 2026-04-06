@@ -12,8 +12,8 @@ const APP_URLS: Record<string, { entryUrl: string; origin: string }> = {
     origin: process.env.WEATHER_APP_URL || 'https://weather-app-one-ecru-12.vercel.app',
   },
   spotify: {
-    entryUrl: process.env.SPOTIFY_APP_URL || 'https://spotify-zeta-green.vercel.app',
-    origin: process.env.SPOTIFY_APP_URL || 'https://spotify-zeta-green.vercel.app',
+    entryUrl: process.env.SPOTIFY_APP_URL || 'https://spotify-chatbridge.vercel.app',
+    origin: process.env.SPOTIFY_APP_URL || 'https://spotify-chatbridge.vercel.app',
   },
   'arts-culture': {
     entryUrl: process.env.ARTS_CULTURE_APP_URL || 'https://googleartcult.vercel.app',
@@ -137,7 +137,16 @@ async function seed() {
       .executeTakeFirst()
 
     if (existing) {
-      console.log(`[seed] App "${app.external_id}" already exists, skipping`)
+      // Update entry_url and allowed_origin in case the app's deploy URL changed
+      await db
+        .updateTable('registry_entries')
+        .set({
+          entry_url: app.manifest.entryUrl,
+          allowed_origin: app.manifest.origin,
+        })
+        .where('app_id', '=', existing.id)
+        .execute()
+      console.log(`[seed] App "${app.external_id}" already exists — updated URLs`)
       continue
     }
 
