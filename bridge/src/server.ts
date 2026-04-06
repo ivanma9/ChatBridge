@@ -21,6 +21,10 @@ const ENABLE_APP_PROXY_DEV = process.env.ENABLE_APP_PROXY_DEV === 'true'
 const app = express()
 app.use(cors(createBridgeCorsOptions()))
 app.use(express.json())
+app.use((req, _res, next) => {
+  console.log(`[bridge] ${req.method} ${req.path} origin=${req.headers.origin || '-'} auth=${req.headers.authorization ? req.headers.authorization.slice(0, 20) + '…' : 'none'}`)
+  next()
+})
 
 // Initialize database
 let dbReady = false

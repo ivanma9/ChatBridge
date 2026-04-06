@@ -64,9 +64,9 @@ function shouldRefresh(expiresAt: number): boolean {
   return expiresAt - Date.now() <= RENEWAL_BUFFER_MS
 }
 
-export async function ensureBridgeClientSession(): Promise<BridgeClientSession | null> {
+export async function ensureBridgeClientSession(forceRefresh = false): Promise<BridgeClientSession | null> {
   const stored = loadStoredSession()
-  if (stored && !shouldRefresh(stored.expires_at)) {
+  if (!forceRefresh && stored && !shouldRefresh(stored.expires_at)) {
     return stored
   }
 

@@ -88,8 +88,8 @@ export async function getBridgeToolSet(): Promise<{
         description: `${appTool.description} — opens the ${app.display_name} app. Use this when the user wants to use ${app.display_name}.`,
         inputSchema: jsonSchemaToZod(appTool.inputSchema),
         execute: async (input: Record<string, unknown>) => {
-          // Ensure bridge client session exists (creates/renews auth token)
-          await ensureBridgeClientSession()
+          // Always get a fresh token before launch — avoids stale-token 401s after server restarts
+          await ensureBridgeClientSession(true)
 
           // Get stable chat session ID
           const chatSessionId = sessionStorage.getItem('bridge_chat_session_id')
