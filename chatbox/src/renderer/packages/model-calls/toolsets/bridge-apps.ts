@@ -107,6 +107,7 @@ export async function getBridgeToolSet(): Promise<{
           })
 
           let appSessionId: string | undefined
+          let launchError: string | undefined
           try {
             const res = await bridgeFetch(`${BRIDGE_URL}/api/sessions/launch`, {
               method: 'POST',
@@ -122,9 +123,13 @@ export async function getBridgeToolSet(): Promise<{
                 activeAppSessionId: appSessionId,
                 toolInput: input,
               })
+            } else {
+              launchError = `launch failed: ${res.status} ${JSON.stringify(data)}`
+              console.error('[bridge-apps] /api/sessions/launch', launchError)
             }
-          } catch {
-            // best effort
+          } catch (err) {
+            launchError = `launch error: ${err instanceof Error ? err.message : String(err)}`
+            console.error('[bridge-apps] /api/sessions/launch threw:', err)
           }
 
           // Fetch session state so the LLM has app context (board state, scores, etc.)
@@ -135,15 +140,19 @@ export async function getBridgeToolSet(): Promise<{
               if (stateRes.ok) {
                 const stateData = await stateRes.json()
                 appState = stateData.state
+              } else {
+                console.error('[bridge-apps] /api/sessions/:id/state', stateRes.status)
               }
-            } catch {
-              // best effort
+            } catch (err) {
+              console.error('[bridge-apps] /api/sessions/:id/state threw:', err)
             }
           }
 
           return {
-            success: true,
-            message: `${app.display_name} has been opened in the side panel. The user can now interact with it directly.`,
+            success: !launchError,
+            message: launchError
+              ? `Failed to open ${app.display_name}: ${launchError}`
+              : `${app.display_name} has been opened in the side panel. The user can now interact with it directly.`,
             app_name: app.display_name,
             tool_called: appTool.name,
             input,
