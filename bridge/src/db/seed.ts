@@ -12,8 +12,8 @@ const APP_URLS: Record<string, { entryUrl: string; origin: string }> = {
     origin: process.env.WEATHER_APP_URL || 'https://weather-app-one-ecru-12.vercel.app',
   },
   spotify: {
-    entryUrl: process.env.SPOTIFY_APP_URL || 'https://spotify-chatbridge.vercel.app',
-    origin: process.env.SPOTIFY_APP_URL || 'https://spotify-chatbridge.vercel.app',
+    entryUrl: process.env.SPOTIFY_APP_URL || 'https://spotify-zeta-green.vercel.app',
+    origin: process.env.SPOTIFY_APP_URL || 'https://spotify-zeta-green.vercel.app',
   },
   'arts-culture': {
     entryUrl: process.env.ARTS_CULTURE_APP_URL || 'https://googleartcult.vercel.app',
