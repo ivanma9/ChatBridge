@@ -12,3 +12,6 @@ build/
 
 # Apps are deployed independently via their own repos
 apps/
+
+# Git worktrees
+.worktrees/
