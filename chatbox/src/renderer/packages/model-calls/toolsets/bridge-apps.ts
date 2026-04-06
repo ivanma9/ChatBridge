@@ -3,6 +3,7 @@ import z from 'zod'
 import { bridgeSurfaceStore } from '@/features/chatbridge/stores/bridgeSurfaceStore'
 import type { ActiveRegistryApp } from '@/features/chatbridge/hooks/useBridgeApps'
 import { BRIDGE_URL } from '@/features/chatbridge/config'
+import { bridgeFetch, ensureBridgeClientSession } from '@/features/chatbridge/bridgeClient'
 
 let cachedApps: ActiveRegistryApp[] = []
 let cacheTime = 0
@@ -87,6 +88,9 @@ export async function getBridgeToolSet(): Promise<{
         description: `${appTool.description} — opens the ${app.display_name} app. Use this when the user wants to use ${app.display_name}.`,
         inputSchema: jsonSchemaToZod(appTool.inputSchema),
         execute: async (input: Record<string, unknown>) => {
+          // Ensure bridge client session exists (creates/renews auth token)
+          await ensureBridgeClientSession()
+
           // Get stable chat session ID
           const chatSessionId = sessionStorage.getItem('bridge_chat_session_id')
             || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -104,7 +108,7 @@ export async function getBridgeToolSet(): Promise<{
 
           let appSessionId: string | undefined
           try {
-            const res = await fetch(`${BRIDGE_URL}/api/sessions/launch`, {
+            const res = await bridgeFetch(`${BRIDGE_URL}/api/sessions/launch`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ chat_session_id: chatSessionId, app_id: app.app_id }),
@@ -127,7 +131,7 @@ export async function getBridgeToolSet(): Promise<{
           let appState: unknown = null
           if (appSessionId) {
             try {
-              const stateRes = await fetch(`${BRIDGE_URL}/api/sessions/${appSessionId}/state`)
+              const stateRes = await bridgeFetch(`${BRIDGE_URL}/api/sessions/${appSessionId}/state`)
               if (stateRes.ok) {
                 const stateData = await stateRes.json()
                 appState = stateData.state
