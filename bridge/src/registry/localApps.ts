@@ -105,5 +105,41 @@ export const localAppManifests: ChatBridgeAppManifest[] = [
         }
       }
     ]
+  },
+  {
+    id: 'arts-culture',
+    version: '0.1.0',
+    name: 'Arts & Culture',
+    description: 'Browse public domain artworks from the Art Institute of Chicago.',
+    entryUrl: process.env.ARTS_CULTURE_APP_URL || 'https://googleartcult.vercel.app',
+    origin: process.env.ARTS_CULTURE_APP_URL || 'https://googleartcult.vercel.app',
+    permissions: ['session:write'],
+    scopes: [],
+    tools: [
+      {
+        name: 'launch_arts_culture',
+        description: 'Open the Arts & Culture explorer to browse public domain artworks from the Art Institute of Chicago.',
+        inputSchema: { type: 'object', properties: {}, required: [] },
+      },
+      {
+        name: 'search_artworks',
+        description: 'Search for public domain artworks in the Art Institute of Chicago collection. All parameters are optional — combine freely.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: "Keyword search, e.g. 'landscape', 'portrait', 'battle'" },
+            date_start: { type: 'number', description: 'Earliest creation year, e.g. 1800' },
+            date_end: { type: 'number', description: 'Latest creation year, e.g. 1899' },
+            medium: { type: 'string', description: "Medium or technique, e.g. 'oil on canvas', 'watercolor', 'bronze'" },
+            classification: { type: 'string', description: "Artwork type, e.g. 'Painting', 'Sculpture', 'Drawing and Watercolor', 'Photograph'" },
+            place_of_origin: { type: 'string', description: "Country or region where the work was made, e.g. 'France', 'Japan', 'United States'" },
+            artist: { type: 'string', description: "Artist name, e.g. 'Monet', 'Rembrandt', 'Georgia O\u2019Keeffe'" },
+            department: { type: 'string', description: "Museum department, e.g. 'Impressionism', 'Photography', 'American Art', 'Asian Art'" },
+            style: { type: 'string', description: "Art style or movement, e.g. 'Impressionism', 'Baroque', 'Abstract Expressionism'" },
+          },
+          required: [],
+        },
+      },
+    ],
   }
 ]
