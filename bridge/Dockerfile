@@ -10,4 +10,4 @@ COPY src/ src/
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["npx", "tsx", "src/server.ts"]
+CMD ["sh", "-c", "npx tsx src/db/migrate.ts && npx tsx src/server.ts"]
