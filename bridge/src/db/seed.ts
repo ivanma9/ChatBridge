@@ -128,12 +128,8 @@ async function seed() {
   const db = initDb()
   console.log('[seed] Connected to database')
 
-  // Clear existing data for a clean reseed
-  await sql`TRUNCATE registry_entries, review_decisions, app_sessions, app_submissions, app_versions, apps CASCADE`.execute(db)
-  console.log('[seed] Cleared existing data')
-
   for (const app of SEED_APPS) {
-    // Check if app already exists
+    // Skip if app already exists (idempotent — safe to run on every deploy)
     const existing = await db
       .selectFrom('apps')
       .select('id')
