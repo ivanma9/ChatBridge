@@ -50,6 +50,16 @@ function storeSession(session: BridgeClientSession): void {
   storage.setItem(STORAGE_KEYS.expiresAt, String(session.expires_at))
 }
 
+function clearStoredSession(): void {
+  const storage = getSessionStorage()
+  if (!storage) {
+    return
+  }
+  storage.removeItem(STORAGE_KEYS.token)
+  storage.removeItem(STORAGE_KEYS.clientId)
+  storage.removeItem(STORAGE_KEYS.expiresAt)
+}
+
 function shouldRefresh(expiresAt: number): boolean {
   return expiresAt - Date.now() <= RENEWAL_BUFFER_MS
 }
@@ -96,8 +106,19 @@ export async function bridgeFetch(input: string, init: RequestInit = {}): Promis
     headers.set(key, value)
   }
 
-  return fetch(input, {
-    ...init,
-    headers,
-  })
+  const response = await fetch(input, { ...init, headers })
+
+  // On 401, the stored token is stale or was signed by a different server.
+  // Clear it and retry once with a freshly-obtained token.
+  if (response.status === 401) {
+    clearStoredSession()
+    const freshAuthHeaders = await getBridgeAuthHeaders()
+    const retryHeaders = new Headers(init.headers || {})
+    for (const [key, value] of Object.entries(freshAuthHeaders)) {
+      retryHeaders.set(key, value)
+    }
+    return fetch(input, { ...init, headers: retryHeaders })
+  }
+
+  return response
 }
