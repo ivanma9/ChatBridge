@@ -1,0 +1,12 @@
+{
+  "buildCommand": "pnpm exec vite build --config vite.web.config.ts",
+  "outputDirectory": "src/renderer/dist-web",
+  "installCommand": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --ignore-scripts",
+  "framework": null,
+  "env": {
+    "VITE_BRIDGE_URL": "https://chatbridge-production-6edb.up.railway.app"
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
