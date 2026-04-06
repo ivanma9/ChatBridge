@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { runManifestSchemaCheck } from '../../src/review/checks/ManifestSchemaCheck'
 import { runPermissionPolicyCheck } from '../../src/review/checks/PermissionPolicyCheck'
 import { runOriginAllowlistCheck } from '../../src/review/checks/OriginAllowlistCheck'
+import { runFrameEmbeddingCheck } from '../../src/review/checks/FrameEmbeddingCheck'
 import { runContentPolicyCheck } from '../../src/review/checks/ContentPolicyCheck'
 import type { ChatBridgeAppManifest } from '../../../../packages/app-sdk/src/contracts'
 
@@ -16,6 +17,10 @@ const VALID_MANIFEST: ChatBridgeAppManifest = {
   scopes: [],
   tools: [{ name: 'test_tool', description: 'A test tool', inputSchema: {} }],
 }
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('ManifestSchemaCheck', () => {
   it('should pass for a valid manifest', async () => {
@@ -71,7 +76,26 @@ describe('OriginAllowlistCheck', () => {
   it('should flag origin/entryUrl mismatch', async () => {
     const manifest = { ...VALID_MANIFEST, entryUrl: 'http://different-origin:3000/app', origin: 'http://localhost:5173' }
     const findings = await runOriginAllowlistCheck(manifest)
-    expect(findings.some(f => f.title.includes('mismatch'))).toBe(true)
+    expect(findings.some(f => f.title.includes('mismatch') && f.severity === 'critical')).toBe(true)
+  })
+})
+
+describe('FrameEmbeddingCheck', () => {
+  it('flags restrictive frame headers', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      headers: new Headers({
+        'x-frame-options': 'DENY',
+        'content-security-policy': "default-src 'self'; frame-ancestors 'self'",
+      }),
+    }))
+
+    const findings = await runFrameEmbeddingCheck({
+      ...VALID_MANIFEST,
+      entryUrl: 'https://apps.example.com/embed',
+      origin: 'https://apps.example.com',
+    })
+
+    expect(findings.some((f) => f.check_name === 'frame_embedding')).toBe(true)
   })
 })
 

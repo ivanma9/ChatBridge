@@ -4,19 +4,22 @@ import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { initDb } from './db/connection.js'
-import { adminAuth, bridgeAuth } from './admin/authMiddleware.js'
+import { adminAuth, bridgeClientAuth } from './admin/authMiddleware.js'
 import { submissionRouter } from './admin/submissionRoutes.js'
 import { decisionRouter } from './admin/decisionRoutes.js'
 import { registryRouter } from './admin/registryRoutes.js'
 import { historyRouter } from './admin/historyRoutes.js'
 import { appProxyRouter } from './admin/appProxyRoutes.js'
-import { AppAuthBroker } from './auth/AppAuthBroker.js'
+import { createBridgeClientSession, isValidClientId } from './auth/BridgeClientSession.js'
 import { createSpotifyRouter } from './auth/OAuthCallbackServer.js'
+import { spotifyAuthBroker } from './auth/spotifyBroker.js'
+import { createBridgeCorsOptions } from './http/cors.js'
 
 const PORT = parseInt(process.env.PORT || '3300', 10)
+const ENABLE_APP_PROXY_DEV = process.env.ENABLE_APP_PROXY_DEV === 'true'
 
 const app = express()
-app.use(cors({ origin: true, credentials: true }))
+app.use(cors(createBridgeCorsOptions()))
 app.use(express.json())
 
 // Initialize database
@@ -38,12 +41,17 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', db: dbReady })
 })
 
+app.post('/api/bridge/session', (req, res) => {
+  const clientId = isValidClientId(req.body?.client_id) ? req.body.client_id : undefined
+  const session = createBridgeClientSession(clientId)
+  res.json(session)
+})
+
 // Spotify OAuth & API proxy
 const spotifyClientId = process.env.SPOTIFY_CLIENT_ID
 const spotifyClientSecret = process.env.SPOTIFY_CLIENT_SECRET
 if (spotifyClientId && spotifyClientSecret) {
-  const broker = new AppAuthBroker()
-  broker.configureOAuth({
+  spotifyAuthBroker.configureOAuth({
     clientId: spotifyClientId,
     clientSecret: spotifyClientSecret,
     redirectUri: process.env.SPOTIFY_REDIRECT_URI || `http://127.0.0.1:${PORT}/auth/spotify/callback`,
@@ -51,7 +59,7 @@ if (spotifyClientId && spotifyClientSecret) {
     tokenUrl: 'https://accounts.spotify.com/api/token',
     scopes: ['playlist-read-private', 'playlist-modify-private', 'user-read-email']
   })
-  app.use(createSpotifyRouter(broker))
+  app.use(createSpotifyRouter(spotifyAuthBroker))
   console.log('[bridge] Spotify OAuth routes enabled')
 } else {
   console.warn('[bridge] Spotify OAuth disabled — missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET')
@@ -60,15 +68,17 @@ if (spotifyClientId && spotifyClientSecret) {
 // Generic tool mediation — any app's tool requests go through here
 import { executeToolRequest } from './orchestration/ToolMediator.js'
 import './orchestration/handlers/authHandler.js' // register built-in handlers
+import './orchestration/handlers/spotifyHandler.js'
 
-app.post('/api/tools/execute', bridgeAuth, async (req, res) => {
+app.post('/api/tools/execute', bridgeClientAuth, async (req, res) => {
   try {
     const { app_id, tool_name, args, session_id } = req.body
     if (!app_id || !tool_name) {
       res.status(400).json({ error: 'app_id and tool_name are required' })
       return
     }
-    const result = await executeToolRequest({ app_id, tool_name, args: args || {}, session_id })
+    const client_id = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+    const result = await executeToolRequest({ app_id, tool_name, args: args || {}, session_id, client_id })
     res.json(result)
   } catch (err) {
     console.error('[tools] Execute error:', err)
@@ -77,9 +87,10 @@ app.post('/api/tools/execute', bridgeAuth, async (req, res) => {
 })
 
 // Keep legacy endpoint for backwards compatibility
-app.post('/api/app-tool/:toolName', bridgeAuth, async (req, res) => {
+app.post('/api/app-tool/:toolName', bridgeClientAuth, async (req, res) => {
   const { app_id, args, session_id } = req.body
-  const result = await executeToolRequest({ app_id, tool_name: req.params.toolName, args: args || {}, session_id })
+  const client_id = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+  const result = await executeToolRequest({ app_id, tool_name: req.params.toolName, args: args || {}, session_id, client_id })
   res.json(result)
 })
 
@@ -90,12 +101,15 @@ if (dbReady) {
   app.use('/api/admin/apps', adminAuth, historyRouter)
   app.use('/api/registry', registryRouter)
   app.use('/api', registryRouter)
-  app.use('/apps', appProxyRouter)
 
-  // Start app proxy on separate port (different origin for iframe isolation)
-  import('./appProxyServer.js').then(({ startAppProxyServer }) => {
-    startAppProxyServer()
-  })
+  if (ENABLE_APP_PROXY_DEV) {
+    app.use('/apps', appProxyRouter)
+
+    // Start app proxy on separate port only for explicit local development use.
+    import('./appProxyServer.js').then(({ startAppProxyServer }) => {
+      startAppProxyServer()
+    })
+  }
 }
 
 app.listen(PORT, () => {

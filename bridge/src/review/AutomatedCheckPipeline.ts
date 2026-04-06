@@ -3,6 +3,7 @@ import type { CheckFinding } from './checks/ManifestSchemaCheck.js'
 import { runManifestSchemaCheck } from './checks/ManifestSchemaCheck.js'
 import { runPermissionPolicyCheck } from './checks/PermissionPolicyCheck.js'
 import { runOriginAllowlistCheck } from './checks/OriginAllowlistCheck.js'
+import { runFrameEmbeddingCheck } from './checks/FrameEmbeddingCheck.js'
 import { runContentPolicyCheck } from './checks/ContentPolicyCheck.js'
 import { runScopeExpansionCheck } from './checks/ScopeExpansionCheck.js'
 import { assessRiskFromFindings, combineRiskLevels } from './RiskAssessor.js'
@@ -15,6 +16,7 @@ const BASE_CHECKS: CheckFn[] = [
   runManifestSchemaCheck,
   runPermissionPolicyCheck,
   runOriginAllowlistCheck,
+  runFrameEmbeddingCheck,
   runContentPolicyCheck,
 ]
 

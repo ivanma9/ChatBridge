@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { AppAuthBroker } from './AppAuthBroker'
+import { bridgeClientAuth } from '../admin/authMiddleware.js'
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1'
 
@@ -8,10 +9,11 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
 
   // -- Auth endpoints -----------------------------------------------
 
-  // Returns the Spotify authorization URL for the host to open in a popup
-  router.get('/auth/spotify/start', (_req, res) => {
+  // Returns the Spotify authorization URL for the host to open in a popup.
+  router.post('/auth/spotify/start', bridgeClientAuth, (req, res) => {
     try {
-      const url = broker.beginOAuth('spotify')
+      const clientId = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+      const url = broker.beginOAuth('spotify', clientId)
       res.json({ url })
     } catch (err) {
       res.status(500).json({ error: (err as Error).message })
@@ -42,8 +44,9 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
   })
 
   // Returns current auth state (for polling)
-  router.get('/auth/spotify/status', (_req, res) => {
-    const snapshot = broker.getSnapshot('spotify')
+  router.get('/auth/spotify/status', bridgeClientAuth, (req, res) => {
+    const clientId = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+    const snapshot = broker.getSnapshot('spotify', clientId)
     if (!snapshot) {
       res.json({ status: 'disconnected', scopes: [] })
       return
@@ -52,23 +55,27 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
   })
 
   // Disconnect — clears tokens and resets state
-  router.post('/auth/spotify/disconnect', (_req, res) => {
-    broker.disconnect('spotify')
+  router.post('/auth/spotify/disconnect', bridgeClientAuth, (req, res) => {
+    const clientId = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+    broker.disconnect('spotify', clientId)
     res.json({ status: 'disconnected' })
   })
 
   // -- Spotify API proxy endpoints ----------------------------------
 
   // GET /api/spotify/playlists — user's playlists
-  router.get('/api/spotify/playlists', async (_req, res) => {
+  router.get('/api/spotify/playlists', bridgeClientAuth, async (req, res) => {
     try {
-      const token = await broker.getValidAccessToken('spotify')
+      const clientId = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+      const token = await broker.getValidAccessToken('spotify', clientId)
       const response = await fetch(`${SPOTIFY_API_BASE}/me/playlists?limit=50`, {
         headers: { Authorization: `Bearer ${token}` }
       })
 
       if (!response.ok) {
-        res.status(response.status).json({ error: 'Spotify API error' })
+        const errBody = await response.text()
+        console.error(`[spotify] API error ${response.status}:`, errBody)
+        res.status(response.status).json({ error: 'Spotify API error: ' + response.status, details: errBody })
         return
       }
 
@@ -80,9 +87,10 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
   })
 
   // POST /api/spotify/playlists — create a new playlist
-  router.post('/api/spotify/playlists', async (req, res) => {
+  router.post('/api/spotify/playlists', bridgeClientAuth, async (req, res) => {
     try {
-      const token = await broker.getValidAccessToken('spotify')
+      const clientId = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+      const token = await broker.getValidAccessToken('spotify', clientId)
       const { name, description, public: isPublic } = req.body
 
       if (!name) {
@@ -104,7 +112,9 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
       })
 
       if (!response.ok) {
-        res.status(response.status).json({ error: 'Spotify API error' })
+        const errBody = await response.text()
+        console.error(`[spotify] API error ${response.status}:`, errBody)
+        res.status(response.status).json({ error: 'Spotify API error: ' + response.status, details: errBody })
         return
       }
 
@@ -116,12 +126,13 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
   })
 
   // GET /api/spotify/playlists/:id/tracks — tracks in a playlist
-  router.get('/api/spotify/playlists/:id/tracks', async (req, res) => {
+  router.get('/api/spotify/playlists/:id/tracks', bridgeClientAuth, async (req, res) => {
     try {
-      const token = await broker.getValidAccessToken('spotify')
+      const clientId = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+      const token = await broker.getValidAccessToken('spotify', clientId)
       const { id } = req.params
-      const limit = req.query.limit || '50'
-      const offset = req.query.offset || '0'
+      const limit = Math.min(Math.max(parseInt(String(req.query.limit || '50'), 10) || 50, 1), 50)
+      const offset = Math.max(parseInt(String(req.query.offset || '0'), 10) || 0, 0)
 
       const response = await fetch(
         `${SPOTIFY_API_BASE}/playlists/${id}/tracks?limit=${limit}&offset=${offset}`,
@@ -129,7 +140,9 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
       )
 
       if (!response.ok) {
-        res.status(response.status).json({ error: 'Spotify API error' })
+        const errBody = await response.text()
+        console.error(`[spotify] API error ${response.status}:`, errBody)
+        res.status(response.status).json({ error: 'Spotify API error: ' + response.status, details: errBody })
         return
       }
 
@@ -141,12 +154,13 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
   })
 
   // GET /api/spotify/search — search tracks
-  router.get('/api/spotify/search', async (req, res) => {
+  router.get('/api/spotify/search', bridgeClientAuth, async (req, res) => {
     try {
-      const token = await broker.getValidAccessToken('spotify')
+      const clientId = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+      const token = await broker.getValidAccessToken('spotify', clientId)
       const q = req.query.q as string
       const type = (req.query.type as string) || 'track'
-      const limit = req.query.limit || '20'
+      const limit = Math.min(Math.max(parseInt(String(req.query.limit || '10'), 10) || 10, 1), 10)
 
       if (!q) {
         res.status(400).json({ error: 'Search query (q) is required' })
@@ -159,7 +173,9 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
       })
 
       if (!response.ok) {
-        res.status(response.status).json({ error: 'Spotify API error' })
+        const errBody = await response.text()
+        console.error(`[spotify] API error ${response.status}:`, errBody)
+        res.status(response.status).json({ error: 'Spotify API error: ' + response.status, details: errBody })
         return
       }
 
@@ -171,15 +187,18 @@ export function createSpotifyRouter(broker: AppAuthBroker): Router {
   })
 
   // GET /api/spotify/me — user profile
-  router.get('/api/spotify/me', async (_req, res) => {
+  router.get('/api/spotify/me', bridgeClientAuth, async (req, res) => {
     try {
-      const token = await broker.getValidAccessToken('spotify')
+      const clientId = (req as typeof req & { bridgeClientId: string }).bridgeClientId
+      const token = await broker.getValidAccessToken('spotify', clientId)
       const response = await fetch(`${SPOTIFY_API_BASE}/me`, {
         headers: { Authorization: `Bearer ${token}` }
       })
 
       if (!response.ok) {
-        res.status(response.status).json({ error: 'Spotify API error' })
+        const errBody = await response.text()
+        console.error(`[spotify] API error ${response.status}:`, errBody)
+        res.status(response.status).json({ error: 'Spotify API error: ' + response.status, details: errBody })
         return
       }
 
@@ -220,12 +239,6 @@ function callbackHtml(status: 'success' | 'error', message: string): string {
     <div style="font-size: 0.85rem; color: #9ca3af; margin-top: 16px;">This window will close automatically...</div>
   </div>
   <script>
-    if (window.opener) {
-      window.opener.postMessage({
-        type: 'spotify-auth-complete',
-        status: '${status}'
-      }, '*');
-    }
     setTimeout(function() { window.close(); }, 1500);
   </script>
 </body>

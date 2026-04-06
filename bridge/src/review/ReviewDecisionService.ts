@@ -67,6 +67,17 @@ export async function decide(input: DecideInput): Promise<DecideResult> {
     if (!version || !app) throw new NotFoundError('Version or app not found')
 
     const manifest = version.manifest as ChatBridgeAppManifest
+    try {
+      const entryOrigin = new URL(manifest.entryUrl).origin
+      if (entryOrigin !== manifest.origin) {
+        throw new ValidationError('Approved app versions must declare an origin that exactly matches the entryUrl origin')
+      }
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error
+      }
+      throw new ValidationError('Approved app versions must provide a valid entryUrl and origin')
+    }
 
     // Check if prior approved version exists (for supersede)
     if (submission.is_update && submission.prior_approved_version_id) {

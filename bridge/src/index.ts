@@ -1,4 +1,5 @@
 export * from './auth/AppAuthBroker'
+export * from './auth/BridgeClientSession'
 export * from './auth/OAuthCallbackServer'
 export * from './orchestration/ToolOrchestrator'
 export * from './persistence/AppSessionStore'

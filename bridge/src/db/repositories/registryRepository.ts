@@ -54,7 +54,7 @@ export async function createAppSession(session: Omit<AppSessionsTable, 'id' | 'c
     .insertInto('app_sessions')
     .values(session)
     .onConflict((oc) =>
-      oc.columns(['chat_session_id', 'app_id']).doNothing()
+      oc.columns(['client_id', 'chat_session_id', 'app_id']).doNothing()
     )
     .returningAll()
     .executeTakeFirstOrThrow()
@@ -68,10 +68,15 @@ export async function findAppSession(sessionId: string): Promise<AppSessionsTabl
     .executeTakeFirst()
 }
 
-export async function findAppSessionByChatAndApp(chatSessionId: string, appId: string): Promise<AppSessionsTable | undefined> {
+export async function findAppSessionByClientChatAndApp(
+  clientId: string,
+  chatSessionId: string,
+  appId: string
+): Promise<AppSessionsTable | undefined> {
   return getDb()
     .selectFrom('app_sessions')
     .selectAll()
+    .where('client_id', '=', clientId)
     .where('chat_session_id', '=', chatSessionId)
     .where('app_id', '=', appId)
     .executeTakeFirst()
@@ -89,14 +94,4 @@ export async function saveSessionState(sessionId: string, state: unknown): Promi
 export async function getSessionState(sessionId: string): Promise<unknown | null> {
   const session = await findAppSession(sessionId)
   return session?.state ?? null
-}
-
-export async function findLatestSessionWithState(appId: string): Promise<AppSessionsTable | undefined> {
-  return getDb()
-    .selectFrom('app_sessions')
-    .selectAll()
-    .where('app_id', '=', appId)
-    .where('state', 'is not', null)
-    .orderBy('updated_at', 'desc')
-    .executeTakeFirst()
 }

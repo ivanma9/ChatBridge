@@ -2,38 +2,12 @@ import type { ChatBridgeAppManifest } from '../../../packages/app-sdk/src'
 
 export const localAppManifests: ChatBridgeAppManifest[] = [
   {
-    id: 'mock-app',
-    version: '0.2.0',
-    name: 'Quick Quiz',
-    description: 'A 3-question quiz that exercises every ChatBridge contract point: manifest loading, iframe hosting, postMessage handshakes, state save/resume, and completion signaling.',
-    entryUrl: 'http://localhost:3201',
-    origin: 'http://localhost:3201',
-    permissions: ['session:write'],
-    scopes: [],
-    tools: [
-      {
-        name: 'launch_quiz',
-        description: 'Launch a 3-question multiple-choice quiz on a given topic.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            topic: {
-              type: 'string',
-              description: "The quiz topic, e.g. 'Geography', 'Science', 'History'."
-            }
-          },
-          required: ['topic']
-        }
-      }
-    ]
-  },
-  {
     id: 'chess',
     version: '0.1.0',
     name: 'Chess',
     description: 'Interactive chess app embedded inside the host chat.',
-    entryUrl: 'http://localhost:3202',
-    origin: 'http://localhost:3202',
+    entryUrl: process.env.CHESS_APP_URL || 'http://localhost:3202',
+    origin: process.env.CHESS_APP_URL || 'http://localhost:3202',
     permissions: ['session:write'],
     scopes: [],
     tools: [
