@@ -3,20 +3,10 @@ import { IconX } from '@tabler/icons-react'
 import { useEffect, useRef } from 'react'
 import { bridgeFetch } from '../bridgeClient'
 import { buildAppUrl } from '../buildAppUrl'
-import { isTrustedBridgeEnvelope } from '../messageValidation'
 import { doesEntryUrlMatchAllowedOrigin } from '../originValidation'
 import { useBridgeSurfaceStore } from '../stores/bridgeSurfaceStore'
 import { useBridgeApps, useLaunchApp } from '../hooks/useBridgeApps'
 import { BRIDGE_URL } from '../config'
-
-const BRIDGE_PROTOCOL_VERSION = '1'
-
-interface BridgeEnvelope<TEvent> {
-  protocolVersion: typeof BRIDGE_PROTOCOL_VERSION
-  appSessionId: string
-  nonce: string
-  event: TEvent
-}
 
 export function EmbeddedBridgeSurface() {
   const activeAppId = useBridgeSurfaceStore((s) => s.activeAppId)
@@ -27,7 +17,6 @@ export function EmbeddedBridgeSurface() {
   const { apps } = useBridgeApps()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const initSent = useRef(false)
-  const mountNonceRef = useRef('')
   const authPollTimerRef = useRef<number | null>(null)
 
   const activeApp = apps.find((a) => a.app_id === activeAppId)
@@ -35,17 +24,9 @@ export function EmbeddedBridgeSurface() {
     ? doesEntryUrlMatchAllowedOrigin(activeApp.entry_url, activeApp.allowed_origin)
     : false
 
-  function nextNonce(): string {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID()
-    }
-    return `nonce-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-  }
-
   // Reset init guard when app changes
   useEffect(() => {
     initSent.current = false
-    mountNonceRef.current = nextNonce()
   }, [activeAppId, activeAppSessionId])
 
   useEffect(() => {
@@ -63,14 +44,9 @@ export function EmbeddedBridgeSurface() {
         return
       }
 
-      const envelope: BridgeEnvelope<typeof event> = {
-        protocolVersion: BRIDGE_PROTOCOL_VERSION,
-        appSessionId: activeAppSessionId,
-        nonce: mountNonceRef.current,
-        event,
-      }
-
-      iframeRef.current.contentWindow.postMessage(envelope, activeApp.allowed_origin)
+      // Send bare { type, payload } — apps don't need to implement envelope parsing.
+      // Security is enforced by targetOrigin on send and origin+source check on receive.
+      iframeRef.current.contentWindow.postMessage(event, activeApp.allowed_origin)
     }
 
     const sendInit = async () => {
@@ -180,19 +156,14 @@ export function EmbeddedBridgeSurface() {
     }
 
     const handler = (event: MessageEvent) => {
-      if (!isTrustedBridgeEnvelope({
-        data: event.data,
-        origin: event.origin,
-        expectedOrigin: activeApp.allowed_origin,
-        source: event.source,
-        expectedSource: iframeRef.current?.contentWindow ?? null,
-        expectedSessionId: activeAppSessionId,
-        expectedNonce: mountNonceRef.current,
-      })) {
-        return
-      }
+      // Accept bare { type, payload } messages from the trusted iframe.
+      // Security: check origin matches the registered allowed_origin and the
+      // message came from this specific iframe (not another frame on the page).
+      if (event.origin !== activeApp.allowed_origin) return
+      if (event.source !== iframeRef.current?.contentWindow) return
 
-      const data = event.data.event as { type: string; payload: any }
+      const data = event.data as { type: string; payload: any }
+      if (!data || typeof data.type !== 'string') return
 
       if (data.type === 'app:ready') {
         sendInit()
