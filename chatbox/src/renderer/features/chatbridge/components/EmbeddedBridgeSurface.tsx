@@ -12,6 +12,7 @@ export function EmbeddedBridgeSurface() {
   const activeAppId = useBridgeSurfaceStore((s) => s.activeAppId)
   const activeAppName = useBridgeSurfaceStore((s) => s.activeAppName)
   const activeAppSessionId = useBridgeSurfaceStore((s) => s.activeAppSessionId)
+  const toolName = useBridgeSurfaceStore((s) => s.toolName)
   const toolInput = useBridgeSurfaceStore((s) => s.toolInput)
   const { close } = useLaunchApp()
   const { apps } = useBridgeApps()
@@ -52,6 +53,7 @@ export function EmbeddedBridgeSurface() {
     const sendInit = async () => {
       if (initSent.current || !iframeRef.current?.contentWindow) return
       initSent.current = true
+      const initialToolInput = toolInput && Object.keys(toolInput).length > 0 ? toolInput : null
 
       // Check for saved state to resume
       let savedState: unknown = null
@@ -71,7 +73,14 @@ export function EmbeddedBridgeSurface() {
       }
 
       if (savedState) {
-        sendToApp({ type: 'host:resume-session', payload: { appSessionId: activeAppSessionId, state: savedState } })
+        sendToApp({
+          type: 'host:resume-session',
+          payload: {
+            appSessionId: activeAppSessionId,
+            state: savedState,
+            input: initialToolInput || {},
+          },
+        })
       } else {
         sendToApp({
           type: 'host:init',
@@ -79,7 +88,7 @@ export function EmbeddedBridgeSurface() {
             appId: activeApp.app_id,
             appSessionId: activeAppSessionId,
             chatSessionId: `chat-${Date.now()}`,
-            input: toolInput || {},
+            input: initialToolInput || {},
           },
         })
 
@@ -87,12 +96,12 @@ export function EmbeddedBridgeSurface() {
         setTimeout(() => {
           sendToApp({ type: 'host:auth-state', payload: { status: 'disconnected', scopes: [] } })
         }, 100)
+      }
 
-        if (toolInput && Object.keys(toolInput).length > 0) {
-          setTimeout(() => {
-            sendToApp({ type: 'host:tool-result', payload: { toolName: 'init', result: toolInput } })
-          }, 200)
-        }
+      if (initialToolInput && toolName) {
+        setTimeout(() => {
+          sendToApp({ type: 'host:tool-result', payload: { toolName, result: initialToolInput } })
+        }, 200)
       }
     }
 
@@ -231,7 +240,7 @@ export function EmbeddedBridgeSurface() {
       window.removeEventListener('message', handler)
       iframe.removeEventListener('load', onLoad)
     }
-  }, [activeApp, activeAppSessionId, hasApprovedOrigin, toolInput])
+  }, [activeApp, activeAppSessionId, hasApprovedOrigin, toolName, toolInput])
 
   if (!activeAppId || !activeApp || !activeAppSessionId) {
     return null

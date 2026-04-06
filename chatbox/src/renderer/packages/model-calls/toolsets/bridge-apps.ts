@@ -103,6 +103,7 @@ export async function getBridgeToolSet(): Promise<{
             activeAppId: app.app_id,
             activeAppName: app.display_name,
             activeAppSessionId: undefined,
+            toolName: appTool.name,
             toolInput: input,
           })
 
@@ -121,6 +122,7 @@ export async function getBridgeToolSet(): Promise<{
                 activeAppId: app.app_id,
                 activeAppName: app.display_name,
                 activeAppSessionId: appSessionId,
+                toolName: appTool.name,
                 toolInput: input,
               })
             } else {
