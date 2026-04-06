@@ -15,6 +15,15 @@ apps/*
 !apps/chess/
 !apps/chess/public/
 !apps/chess/public/index.html
+!apps/spotify/
+!apps/spotify/public/
+!apps/spotify/public/index.html
+!apps/weather/
+!apps/weather/public/
+!apps/weather/public/index.html
+!apps/google_art_cult/
+!apps/google_art_cult/public/
+!apps/google_art_cult/public/index.html
 
 # Git worktrees
 .worktrees/
