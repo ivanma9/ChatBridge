@@ -11,7 +11,10 @@ build/
 *.swp
 
 # Apps are deployed independently via their own repos
-apps/
+apps/*
+!apps/chess/
+!apps/chess/public/
+!apps/chess/public/index.html
 
 # Git worktrees
 .worktrees/
