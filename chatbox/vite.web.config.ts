@@ -60,8 +60,8 @@ export default defineConfig({
     TanStackRouterVite({
       target: 'react',
       autoCodeSplitting: true,
-      routesDirectory: './routes',
-      generatedRouteTree: './routeTree.gen.ts',
+      routesDirectory: path.resolve(__dirname, 'src/renderer/routes'),
+      generatedRouteTree: path.resolve(__dirname, 'src/renderer/routeTree.gen.ts'),
     }),
     react(),
     dvhToVh(),
