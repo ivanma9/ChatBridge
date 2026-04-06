@@ -7,6 +7,9 @@ RUN npm ci --omit=dev
 
 COPY src/ src/
 
+# Pre-built Chatbox SPA — served at / by Express
+COPY public/ public/
+
 ENV PORT=8080
 EXPOSE 8080
 

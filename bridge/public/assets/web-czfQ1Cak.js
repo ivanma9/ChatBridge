@@ -1,0 +1,1 @@
+import{W as n}from"./index-BixeENMA.js";import"./vendor-charts-BEdRI0Jn.js";import"./vendor-ai-CuMtS5pt.js";import"./vendor-ui-DI-XfE9b.js";class p extends n{async show(e){}async hide(e){}}export{p as SplashScreenWeb};
