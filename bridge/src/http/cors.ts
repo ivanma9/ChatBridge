@@ -22,7 +22,7 @@ export function getAllowedCorsOrigins(env: NodeJS.ProcessEnv = process.env): str
 }
 
 export function isAllowedCorsOrigin(origin: string | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
-  if (!origin || origin === 'null') {
+  if (!origin) {
     return true
   }
 
