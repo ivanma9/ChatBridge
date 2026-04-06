@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { existsSync } from 'fs'
 import { initDb } from './db/connection.js'
 import { adminAuth, bridgeClientAuth } from './admin/authMiddleware.js'
 import { submissionRouter } from './admin/submissionRoutes.js'
@@ -114,6 +115,15 @@ if (dbReady) {
       startAppProxyServer()
     })
   }
+}
+
+// Serve chatbox SPA (unified Docker deployment)
+const publicDir = path.join(__dirname, '..', 'public')
+if (existsSync(publicDir)) {
+  app.use(express.static(publicDir))
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(publicDir, 'index.html'))
+  })
 }
 
 app.listen(PORT, () => {

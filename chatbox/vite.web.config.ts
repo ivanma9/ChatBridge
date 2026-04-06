@@ -106,7 +106,7 @@ export default defineConfig({
     'process.env.USE_LOCAL_API': '""',
     'process.env.USE_BETA_API': '""',
     'import.meta.env.VITE_BRIDGE_URL': JSON.stringify(
-      process.env.VITE_BRIDGE_URL || 'https://chatbridge-production-6edb.up.railway.app'
+      process.env.VITE_BRIDGE_URL ?? ''
     ),
   },
   optimizeDeps: {
